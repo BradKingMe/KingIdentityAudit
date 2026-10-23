@@ -1,0 +1,372 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-23T03:41:33.789Z",
+  "title": "Design System: KingIdentity Audit",
+  "extensions": {
+    "colorMeta": {
+      "brand": {
+        "role": "primary",
+        "displayName": "Fluent Action Blue",
+        "tonalRamp": [
+          "oklch(15% 0.14 250)",
+          "oklch(26% 0.14 250)",
+          "oklch(37% 0.14 250)",
+          "oklch(49% 0.14 250)",
+          "oklch(60% 0.14 250)",
+          "oklch(72% 0.14 250)",
+          "oklch(84% 0.14 250)",
+          "oklch(95% 0.14 250)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "brand-foreground": {
+        "role": "primary",
+        "displayName": "Fluent Link Blue",
+        "tonalRamp": [
+          "oklch(15% 0.14 250)",
+          "oklch(26% 0.14 250)",
+          "oklch(37% 0.14 250)",
+          "oklch(49% 0.14 250)",
+          "oklch(60% 0.14 250)",
+          "oklch(72% 0.14 250)",
+          "oklch(84% 0.14 250)",
+          "oklch(95% 0.14 250)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Workspace White",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "surface-secondary": {
+        "role": "neutral",
+        "displayName": "Context Gray",
+        "tonalRamp": [
+          "oklch(15% 0.005 250)",
+          "oklch(26% 0.005 250)",
+          "oklch(37% 0.005 250)",
+          "oklch(49% 0.005 250)",
+          "oklch(60% 0.005 250)",
+          "oklch(72% 0.005 250)",
+          "oklch(84% 0.005 250)",
+          "oklch(95% 0.005 250)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "stroke": {
+        "role": "neutral",
+        "displayName": "Control Stroke",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "stroke-soft": {
+        "role": "neutral",
+        "displayName": "Quiet Divider",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Primary Ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Supporting Ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "text-tertiary": {
+        "role": "neutral",
+        "displayName": "Metadata Ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Danger Red",
+        "tonalRamp": [
+          "oklch(15% 0.16 25)",
+          "oklch(26% 0.16 25)",
+          "oklch(37% 0.16 25)",
+          "oklch(49% 0.16 25)",
+          "oklch(60% 0.16 25)",
+          "oklch(72% 0.16 25)",
+          "oklch(84% 0.16 25)",
+          "oklch(95% 0.16 25)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Warning Orange",
+        "tonalRamp": [
+          "oklch(15% 0.16 40)",
+          "oklch(26% 0.16 40)",
+          "oklch(37% 0.16 40)",
+          "oklch(49% 0.16 40)",
+          "oklch(60% 0.16 40)",
+          "oklch(72% 0.16 40)",
+          "oklch(84% 0.16 40)",
+          "oklch(95% 0.16 40)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus Ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(72% 0 0)",
+          "oklch(84% 0 0)",
+          "oklch(95% 0 0)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      },
+      "local-status": {
+        "role": "semantic",
+        "displayName": "Local Status Green",
+        "tonalRamp": [
+          "oklch(15% 0.12 145)",
+          "oklch(26% 0.12 145)",
+          "oklch(37% 0.12 145)",
+          "oklch(49% 0.12 145)",
+          "oklch(60% 0.12 145)",
+          "oklch(72% 0.12 145)",
+          "oklch(84% 0.12 145)",
+          "oklch(95% 0.12 145)"
+        ],
+        "rampPurpose": "Synthesized preview ramp; not an implemented theme scale."
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Page headline",
+        "purpose": "Compact page title alongside desktop actions."
+      },
+      "title": {
+        "displayName": "Panel title",
+        "purpose": "Task and panel titles."
+      },
+      "body": {
+        "displayName": "Operational body",
+        "purpose": "Built stylesheet base; preserve Fluent control typography."
+      },
+      "evidence": {
+        "displayName": "Evidence metadata",
+        "purpose": "Source explanations, notes and captured context."
+      },
+      "path": {
+        "displayName": "Recorded relationship",
+        "purpose": "Wrapping ordered access chains."
+      },
+      "kicker": {
+        "displayName": "Structural kicker",
+        "purpose": "Small uppercase panel and navigation metadata."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel",
+        "value": "0 1px 2px rgb(0 0 0 / 3%)",
+        "purpose": "Minimal depth under task panels and overview metrics."
+      },
+      {
+        "name": "brand-mark",
+        "value": "0 3px 10px color-mix(in srgb, var(--brand) 20%, transparent)",
+        "purpose": "Small ambient shadow for the existing brand mark."
+      }
+    ],
+    "motion": [
+      {
+        "name": "reduced-motion",
+        "value": "transition-duration: .01ms; animation-duration: .01ms; animation-iteration-count: 1; scroll-behavior: auto",
+        "purpose": "Global prefers-reduced-motion override. Normal interaction feedback is owned by Fluent."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop",
+        "value": "1120px"
+      },
+      {
+        "name": "icon-rail",
+        "value": "860px"
+      },
+      {
+        "name": "access-stack",
+        "value": "760px"
+      },
+      {
+        "name": "phone",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Fluent action",
+      "kind": "button",
+      "description": "Framework-free visual translation of the installed Fluent primary Button; production uses Fluent Button.",
+      "html": "<button class=\"ds-primary\">Create review case</button>",
+      "css": ".ds-primary{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;border:1px solid transparent;border-radius:4px;background:var(--colorBrandBackground,#0f6cbd);color:#fff;padding:5px 12px;min-height:32px;font-weight:600;cursor:pointer}.ds-primary:hover{background:var(--colorBrandBackgroundHover,#115ea3)}.ds-primary:active{background:var(--colorBrandBackgroundPressed,#0c3b5e)}.ds-primary:focus-visible,.ds-secondary:focus-visible,.ds-subtle:focus-visible{outline:2px solid var(--focus,#000);outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Fluent action",
+      "kind": "button",
+      "description": "Framework-free translation of standard Fluent secondary actions such as restore.",
+      "html": "<button class=\"ds-secondary\">Restore review package</button>",
+      "css": ".ds-secondary{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;border:1px solid var(--colorNeutralStroke1,#d1d1d1);border-radius:4px;background:var(--colorNeutralBackground1,#fff);color:var(--colorNeutralForeground1,#242424);padding:5px 12px;min-height:32px;font-weight:600;cursor:pointer}.ds-secondary:hover{background:var(--colorNeutralBackground1Hover,#f5f5f5)}.ds-secondary:active{background:var(--colorNeutralBackground1Pressed,#e0e0e0)}.ds-primary:focus-visible,.ds-secondary:focus-visible,.ds-subtle:focus-visible{outline:2px solid var(--focus,#000);outline-offset:2px}"
+    },
+    {
+      "name": "Subtle workspace action",
+      "kind": "button",
+      "description": "Inactive Access workspace switch; selected appearance uses the primary variant.",
+      "html": "<button class=\"ds-subtle\" aria-pressed=\"false\">Sign-in evidence</button>",
+      "css": ".ds-subtle{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--text,#242424);padding:5px 12px;min-height:32px;font-weight:600;cursor:pointer}.ds-subtle:hover{background:var(--colorSubtleBackgroundHover,#f5f5f5)}.ds-subtle:active{background:var(--colorSubtleBackgroundPressed,#e0e0e0)}.ds-primary:focus-visible,.ds-secondary:focus-visible,.ds-subtle:focus-visible{outline:2px solid var(--focus,#000);outline-offset:2px}"
+    },
+    {
+      "name": "Access labeled field",
+      "kind": "input",
+      "refersTo": "access-field",
+      "description": "Native access field with a visible label and blue keyboard focus.",
+      "html": "<label class=\"ds-field\">Review owner<input placeholder=\"Name or team\"></label>",
+      "css": ".ds-field{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;display:flex;flex-direction:column;gap:7px;font-weight:600;color:var(--text,#242424)}.ds-field input{font:inherit;font-weight:400;min-width:0;min-height:38px;padding:8px 10px;border:1px solid var(--stroke,#d1d1d1);border-radius:4px;color:var(--text,#242424);background:var(--surface,#fff)}.ds-field input:focus-visible{outline:2px solid var(--brand,#0f6cbd);outline-offset:2px}"
+    },
+    {
+      "name": "Current navigation action",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Text and icon stay together in the primary rail action; the production rail uses Fluent icons.",
+      "html": "<nav aria-label=\"Workspace\"><button class=\"ds-nav\" aria-current=\"page\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"6.5\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"m15 15 5 5\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>Access</button></nav>",
+      "css": ".ds-nav{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;display:flex;align-items:center;gap:8px;width:100%;min-height:42px;padding:0 12px;border:1px solid transparent;border-radius:7px;background:var(--colorBrandBackground,#0f6cbd);color:#fff;font-weight:600;cursor:pointer}.ds-nav:hover{background:var(--colorBrandBackgroundHover,#115ea3)}.ds-nav:focus-visible{outline:2px solid var(--focus,#000);outline-offset:2px}"
+    },
+    {
+      "name": "Entitlement kind badge",
+      "kind": "chip",
+      "description": "Framework-free visual translation of the Fluent outline badge used for entitlement kind.",
+      "html": "<span class=\"ds-badge\">Group</span>",
+      "css": ".ds-badge{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;display:inline-flex;align-items:center;font-size:12px;line-height:16px;padding:0 5px;border:1px solid var(--colorBrandStroke1,#0f6cbd);border-radius:10px;color:var(--brand-foreground,#0f6cbd);background:transparent}"
+    },
+    {
+      "name": "Task panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "One bounded task surface; assignment rows remain flat within it.",
+      "html": "<section class=\"ds-panel\"><h2>Why does this person have access?</h2><p>Follow recorded memberships and assignments.</p></section>",
+      "css": ".ds-panel{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;min-width:0;padding:20px;border:1px solid var(--stroke-soft,#e1e1e1);border-radius:9px;background:var(--surface,#fff);color:var(--text,#242424);box-shadow:0 1px 2px rgb(0 0 0 / 3%)}.ds-panel h2{margin:0 0 6px;font-size:16px;line-height:1.35;letter-spacing:-.02em;font-weight:650}.ds-panel p{margin:0;color:var(--text-secondary,#616161);line-height:1.6}@media(max-width:640px){.ds-panel{padding:15px}}"
+    },
+    {
+      "name": "Coverage disclosure",
+      "kind": "custom",
+      "refersTo": "coverage-disclosure",
+      "description": "Native expandable coverage context, also used for captured review identity context.",
+      "html": "<details class=\"ds-coverage\"><summary>Collection coverage and limitations</summary><p>Recorded evidence can omit unconnected systems.</p></details>",
+      "css": ".ds-coverage{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;padding:14px;background:var(--surface-secondary,#f4f6f8);border:1px solid var(--stroke-soft,#e1e1e1);border-radius:4px;color:var(--text,#242424)}.ds-coverage summary{cursor:pointer;font-weight:600;line-height:1.6}.ds-coverage summary:focus-visible{outline:2px solid var(--focus,#000);outline-offset:2px}.ds-coverage p{color:var(--text-secondary,#616161);line-height:1.6;margin:8px 0 0;overflow-wrap:anywhere}"
+    },
+    {
+      "name": "Recorded access path",
+      "kind": "custom",
+      "description": "Flat evidence row with directional path and nearby source/capture metadata.",
+      "html": "<article class=\"ds-entry\"><strong>Finance Analysts</strong><ol class=\"ds-chain\" aria-label=\"Recorded access path\"><li>Alice Wu</li><li>Finance Analysts</li></ol><p>Direct membership · Entra ID · Captured Oct 20, 2026</p><details><summary>Source identifiers and limits</summary><code>entra-user-alice → finance-group</code></details></article>",
+      "css": ".ds-entry{font-family:\"Segoe UI\",system-ui,-apple-system,BlinkMacSystemFont,sans-serif;font-size:14px;border-bottom:1px solid var(--stroke-soft,#e1e1e1);padding:18px 0;min-width:0;color:var(--text,#242424)}.ds-entry strong,.ds-entry code{overflow-wrap:anywhere}.ds-chain{list-style:none;display:flex;flex-wrap:wrap;gap:8px 0;padding:0;margin:14px 0 10px}.ds-chain li{display:flex;align-items:center;line-height:1.5;font-size:13px;overflow-wrap:anywhere;max-width:100%}.ds-chain li+li:before{content:\"→\";color:var(--text-secondary,#616161);padding:0 10px}.ds-entry p,.ds-entry details{margin:6px 0;color:var(--text-secondary,#616161);font-size:12px;line-height:1.65}.ds-entry summary{cursor:pointer}.ds-entry summary:focus-visible{outline:2px solid var(--focus,#000);outline-offset:2px}.ds-entry code{display:block;margin:8px 0;white-space:pre-wrap}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Identity Evidence Workbench",
+    "overview": "KingIdentity uses a light enterprise workspace: Segoe typography, Fluent blue actions, white panels, restrained separators and compact evidence rows. The hierarchy helps administrators select an identity, follow recorded relationships and prepare a review while keeping source context and uncertainty visible.\n\nThis document captures the built interface in `src/App.jsx`, `src/views/EnterpriseViews.jsx`, `src/views/AccessWorkbench.jsx` and `src/styles.css`, with the final Access Explorer and employee review captures under `.impeccable/review/access/`. `design-system/MASTER.md` remains the incumbent authority. Fluent UI React v9 under `FluentProvider` with `webLightTheme` supplies the component foundation. The descriptive name above summarizes that existing system; it does not establish a new identity. These observations document presentation, not live integration verification.",
+    "keyCharacteristics": [
+      "Calm light surfaces and one blue action accent.",
+      "Compact operational hierarchy with explicit evidence labels.",
+      "Bordered panels, flat evidence lists and limited shadow.",
+      "Responsive forms and labeled table cells that retain context.",
+      "Source, capture time and limitations placed near evidence."
+    ],
+    "rules": [
+      {
+        "name": "The Labeled Signal Rule",
+        "body": "Every severity, coverage and review state needs visible text; color supplements its meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Evidence Proximity Rule",
+        "body": "Keep a recorded relationship's source, basis, capture time and limitations beside that relationship.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do preserve Fluent UI v9, Segoe typography and the light enterprise workspace.",
+      "Do retain source, capture time and limitations beside recorded evidence.",
+      "Do keep labels visible when forms and evidence records stack on narrow screens.",
+      "Do use semantic state text alongside color and preserve keyboard focus visibility.",
+      "Do reuse flat assignment rows and native disclosures inside the parent task panel."
+    ],
+    "donts": [
+      "Don't present empty evidence as proof that access or activity does not exist.",
+      "Don't hide source identifiers, review uncertainty or synthetic/restored warnings to simplify the layout.",
+      "Don't substitute decorative charts or assurance scores for operational evidence.",
+      "Don't introduce a second component theme or a new font family for the Access extension."
+    ]
+  }
+}

@@ -13,6 +13,16 @@ const isTimestamp = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T
 const isTimestampOrNull = (value) => value == null || isTimestamp(value);
 const uniqueText = (values) => new Set(values.map((value) => value.toLowerCase())).size === values.length;
 const validSourceMode = (value) => value == null || ["synthetic", "live", "imported"].includes(value);
+const requiredText = value => typeof value === 'string' && value.trim().length > 0 && value.length <= 2048;
+const accessKeys = ['groupMemberships','roleDefinitions','roleAssignments','applications','applicationAssignments'];
+function validAccessRows(source) {
+  return validRows(source,'groupMemberships',[['memberId',requiredText],['groupId',requiredText]]) &&
+    validRows(source,'roleDefinitions',[['displayName',isStringOrNull]]) &&
+    validRows(source,'roleAssignments',[['principalId',requiredText],['roleDefinitionId',requiredText],['directoryScopeId',isStringOrNull],['appScopeId',isStringOrNull]]) &&
+    validRows(source,'applications',[['displayName',isStringOrNull],['appRoles',value => Array.isArray(value) && value.length <= 1000 && value.every(role=>isRecord(role)&&requiredText(role.id)&&isStringOrNull(role.displayName)&&isStringOrNull(role.value))]]) &&
+    validRows(source,'applicationAssignments',[['principalId',requiredText],['resourceId',requiredText],['appRoleId',requiredText],['resourceDisplayName',isStringOrNull],['principalType',isStringOrNull]]) &&
+    ['groupCoverage','applicationCoverage'].every(key => source[key] == null || validRows(source,key,[['status',value=>['complete','partial','failed'].includes(value)]]));
+}
 
 function validCollectionStatus(source, keys) {
   if (source.collectionStatus == null) return true;
@@ -36,7 +46,7 @@ function validateEvidenceSources(sources) {
   if (sources.entra != null) {
     const entra = sources.entra;
     if (!isRecord(entra) || !isStringOrNull(entra.tenantId) || !isTimestampOrNull(entra.capturedAt) || !validSourceMode(entra.sourceMode) ||
-        !validCollectionStatus(entra, ["users", "groups", "directoryRoles", "signIns", "directoryAudits"]) ||
+        !validCollectionStatus(entra, ["users", "groups", "directoryRoles", "signIns", "directoryAudits", ...accessKeys]) || !validAccessRows(entra) ||
         (entra.permissions != null && !isTextList(entra.permissions)) ||
         (entra.collectionWarnings != null && !isTextList(entra.collectionWarnings)) ||
         (entra.activityDays != null && !isNumberOrNull(entra.activityDays)) ||
@@ -164,6 +174,12 @@ export function parseSnapshotText(text) {
   }
 
   for (const domain of snapshot.domains) {
+    if (domain.accessEvidence != null) {
+      const access = domain.accessEvidence;
+      if (!isRecord(access) || !validCollectionStatus(access,['groups','groupMemberships']) ||
+        !validRows(access,'groups',[['displayName',isStringOrNull]]) || !validAccessRows(access) ||
+        (access.collectionWarnings != null && !isTextList(access.collectionWarnings))) throw new Error('A domain contains invalid access relationship evidence.');
+    }
     if (!domain.principals.every((row) => typeof row.accountName === "string" && typeof row.objectClass === "string") ||
         !uniqueText(domain.principals.map((row) => `${row.objectClass}:${row.accountName}`))) throw new Error("A domain contains duplicate or invalid principal identities.");
     for (const field of ["objectGuid", "objectSid"]) {

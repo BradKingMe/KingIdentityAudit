@@ -1,4 +1,5 @@
 import { fetchGraphCollection, graphQueryPath } from "./graphClient.js";
+import { collectAccessEvidence, ENTRA_ACCESS_SCOPES } from './accessEvidence.js';
 
 export const ENTRA_GROUP_SCOPES = ["Group.Read.All"];
 export const ENTRA_ROLE_SCOPES = ["RoleManagement.Read.Directory"];
@@ -63,6 +64,7 @@ function normalizeGroup(group) {
     groupTypes: Array.isArray(group.groupTypes) ? group.groupTypes.filter((item) => typeof item === "string") : [],
     securityEnabled: nullableBoolean(group.securityEnabled),
     mailEnabled: nullableBoolean(group.mailEnabled),
+    visibility: text(group.visibility),
   };
 }
 
@@ -132,21 +134,24 @@ export async function collectEntraEvidence({
   includeDirectory = true,
   includeAccountDetails = false,
   includeActivity = false,
+  includeAccess = false,
   activityDays = 30,
   tenantId = null,
   signal,
 }) {
+  if (includeAccess) includeDirectory = true;
   if (!Number.isInteger(activityDays) || activityDays < 1 || activityDays > 90) throw new Error("Activity collection days must be an integer from 1 to 90.");
   const warnings = [];
   const status = Object.fromEntries(["users", "groups", "directoryRoles", "signIns", "directoryAudits"].map((key) => [key, "not-selected"]));
   const selectedScopes = [
     ...(includeDirectory ? getEntraDirectoryScopes(includeAccountDetails) : []),
     ...(includeActivity ? ENTRA_ACTIVITY_SCOPES : []),
+    ...(includeAccess ? ENTRA_ACCESS_SCOPES : []),
   ];
   const evidence = {
     tenantId: text(tenantId),
     capturedAt: new Date().toISOString(),
-    permissions: selectedScopes,
+    permissions: [...new Set(selectedScopes)],
     activityDays: includeActivity ? activityDays : null,
     users: [],
     groups: [],
@@ -166,7 +171,7 @@ export async function collectEntraEvidence({
       "$top": "999",
     });
     const groupPath = graphQueryPath("groups", {
-      "$select": "id,displayName,description,groupTypes,securityEnabled,mailEnabled",
+      "$select": "id,displayName,description,groupTypes,securityEnabled,mailEnabled,visibility",
       "$top": "999",
     });
     const rolePath = graphQueryPath("directoryRoles", { "$select": "id,displayName,roleTemplateId" });
@@ -179,6 +184,13 @@ export async function collectEntraEvidence({
     evidence.users = users.map(normalizeUser).filter((item) => item.id);
     evidence.groups = groups.map(normalizeGroup).filter((item) => item.id);
     evidence.directoryRoles = roles.map(normalizeRole).filter((item) => item.id);
+  }
+
+  if (includeAccess) {
+    const access = await collectAccessEvidence({getToken, groups:evidence.groups, groupsStatus:status.groups, signal});
+    Object.assign(evidence, Object.fromEntries(Object.entries(access).filter(([key])=>!['collectionStatus','collectionWarnings'].includes(key))));
+    Object.assign(status,access.collectionStatus);
+    warnings.push(...access.collectionWarnings);
   }
 
   if (includeActivity) {

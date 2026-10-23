@@ -13,7 +13,7 @@ pnpm dev
 
 Open the local address printed by Vite. The dashboard starts with a clearly labeled synthetic AD DS, Entra, and Intune example. Use **Import snapshot** to load an AD DS or exported KingIdentity workspace snapshot. Use **Save report** to print or save the current view as a PDF.
 
-Select an account in **Directory** to open its profile and see AD signals, exact-UPN Entra matches, and related Intune devices. **Access** explains the fields returned for a selected Entra sign-in. **Compare** reviews two snapshots, while **Tasks** creates an exportable checklist with no execution calls. **Sources** configures optional Graph reads and shows the evidence scope.
+Select an account in **Directory** to open its profile and see AD signals, exact-UPN Entra matches, and related Intune devices. **Access** now includes an Access Explorer, sign-in evidence and employee review cases. **Compare** reviews two snapshots, while **Tasks** creates an exportable checklist with no execution calls. **Sources** configures optional Graph reads and shows the evidence scope.
 
 ## Collect an AD DS snapshot
 
@@ -42,7 +42,27 @@ Live collection replaces the synthetic workspace with a cloud-only workspace. Im
 | Optional sign-in and directory audit logs | `AuditLog.Read.All` |
 | Optional Intune managed-device inventory | `DeviceManagementManagedDevices.Read.All` |
 
-Entra basic mode collects only basic user profile fields. `User.Read.All` is optional because it grants a wider read of user profiles; tenant policy may require administrator consent. Audit-log reads also depend on supported Entra roles and tenant retention. Intune reads require the service to be licensed. The current connector calls the global Microsoft Graph v1.0 endpoint. Each evidence collection requests its own scope and reports failures separately, so optional activity or device consent does not suppress other selected evidence. It collects group properties and activated directory role names, not group membership paths or role assignments. Collection is page-limited and incomplete results are labeled with warnings.
+Entra basic mode collects only basic user profile fields. `User.Read.All` is optional because it grants a wider read of user profiles; tenant policy may require administrator consent. Audit-log reads also depend on supported Entra roles and tenant retention. Intune reads require the service to be licensed. The current connector calls the global Microsoft Graph v1.0 endpoint. Each evidence collection requests its own scope and reports failures separately, so optional activity or device consent does not suppress other selected evidence. Basic directory collection includes group properties and activated directory role names. The separate **Access relationships** option collects direct group edges, role definitions/assignments and enterprise app-role assignments; it adds delegated `Application.Read.All` to existing `Group.Read.All` and `RoleManagement.Read.Directory` reads. Supported operator roles and consent are still required. Collection is page-limited and incomplete results are labeled with warnings.
+
+## Access Explorer and employee reviews
+
+Open **Access → Access explorer** and select a source-specific user. Direct edges are reconstructed into nested group paths locally. Each path shows its source, capture time, basis and object identifiers. Active role assignments and app-role assignments are joined by source IDs. Application/role assignments are followed through direct groups only; nested group membership does not establish those grants. App-local permissions, Conditional Access enforcement and resource ACLs remain outside this view.
+
+An exact-UPN account in the other directory is a candidate. Check the confirmation only after independently verifying that the accounts belong to the same person. Confirmation applies to this workspace instance and is not an immutable-ID correlation. Ambiguous UPN candidates are excluded. Matching device/activity context uses source IDs and tenant boundaries.
+
+For AD direct membership evidence, collect a new snapshot with the optional switch:
+
+```powershell
+pwsh -File .\collectors\Collect-ADDS.ps1 -OutputPath C:\Audit\access-snapshot.json -IncludeAccessMemberships
+```
+
+The AD pass defaults to 200 groups per domain (`-MaxAccessGroups`, range 1–1000) and retains up to 20,000 edges per domain. It records per-group failures/partial results. Primary-group membership, SID history, trust resolution and resource ACLs are excluded. The older recursive privileged-group inventory cannot reconstruct a path. The Graph access pass reads up to 100 returned groups, 50 service principals, 20,000 membership edges and 20,000 app assignments. Hidden memberships and PIM eligibility are not collected. Narrow your source scope or investigate unreturned objects separately. Cancellation uses **Clear cloud data** in Sources.
+
+Choose **Access review**, **New hire**, **Department transfer** or **Offboarding**, then **Create review case**. Cases freeze the selected evidence and support owner, due date, notes, decisions with reasons, checklist and status. Closing requires an owner and completed decisions/checklist; this is an operator attestation, not a signature or independently verified approval. Changes to closed cases reopen them. No HR status is inferred.
+
+**Export review package** downloads restorable JSON. **Export action plan** downloads Markdown with decisions, source IDs, checklist, coverage and limitations. Restore creates a separate case, marks the unsigned package unverified and reopens it for review. Up to 25 cases are kept in React memory across app navigation and workspace changes. They are lost on reload/close unless exported; workspace snapshot exports do not include review cases. Review JSON imports are limited to 10 MB. Real review files contain sensitive identity evidence and notes.
+
+Path exploration stops at 12 membership edges, 500 paths or 4,000 queued paths per source; cycles/limits are disclosed. UI lists show 50 paths per page, searches show up to 200 matching identities, device context shows up to 10 devices and activity context up to 10 matching events. Review JSON retains the full captured case evidence within its limits. Empty paths never prove absence of access.
 
 ## What it reviews
 
@@ -71,7 +91,7 @@ KingIdentity grows through separate, opt-in source adapters. Each adapter disclo
 - Entra user, group, role, sign-in, and audit detail depends on selected scopes, tenant roles, licensing, result limits, and log retention. Conditional Access policy detail is not collected.
 - Intune data is limited to the selected managed-device properties. It does not collect compliance policies, endpoint security settings, or remote actions.
 - Cross-source AD/Entra linking uses exact UPN in this version. It does not infer identity from display name or decode source-specific immutable IDs.
-- Group membership paths and user-to-role assignments are not collected from Entra yet.
+- Optional access collection includes direct membership edges and active user/group role assignments. PIM eligibility, hidden memberships, app-local permissions and effective authorization are not established.
 - **Tasks** creates an operator checklist only. It does not disable accounts, change memberships, assign roles, or issue Intune actions.
 - Account profiles match privileged group members by GUID or SID. Older member rows without stable IDs remain in group inventory but do not establish profile membership. Recursive membership does not retain each nested group path.
 - Snapshot comparison requires the same Microsoft tenant or AD forest/domain scope and complete inventory coverage. Failed, partial, or unselected collections are not treated as empty inventories. A collection that legitimately returns zero rows is recorded separately from a failed read.
@@ -95,10 +115,16 @@ KingIdentity grows through separate, opt-in source adapters. Each adapter disclo
 - [Microsoft AD DS service account guidance](https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/understand-service-accounts)
 - [Microsoft `Get-ADReplicationFailure` reference](https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-adreplicationfailure?view=windowsserver2025-ps)
 - [Microsoft `Get-ADUser` reference](https://learn.microsoft.com/en-us/powershell/module/activedirectory/get-aduser)
+- [Direct group members](https://learn.microsoft.com/en-us/graph/api/group-list-members?view=graph-rest-1.0), [active directory role assignments](https://learn.microsoft.com/en-us/graph/api/rbacapplication-list-roleassignments?view=graph-rest-1.0), and [enterprise application assignments](https://learn.microsoft.com/en-us/graph/api/serviceprincipal-list-approleassignedto?view=graph-rest-1.0)
+- [Application group assignments and nested membership limitations](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/assign-user-or-group-access-portal)
 
 ## License
 
 No license is included yet. Ask the maintainer to choose reuse terms before redistributing this code.
+
+## Access feature verification
+
+The production build and desktop/mobile interface were inspected with synthetic evidence, including review creation, ownership editing, JSON export and restore into a separate case. No new automated test suite was added or run for this feature request. Live AD DS collection, Microsoft sign-in/consent and tenant relationship reads still require validation in an authorized test directory/tenant. The earlier audit report describes the checks run on the preceding version; it is not certification of these new connectors.
 
 ## Development checks
 

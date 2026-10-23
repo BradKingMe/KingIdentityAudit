@@ -35,6 +35,7 @@ import { collectEntraEvidence } from "./connectors/entra.js";
 import { collectIntuneEvidence } from "./connectors/intune.js";
 import { AccessInvestigationView, CompareView, SourcesView, TasksView } from "./views/EnterpriseViews.jsx";
 import collectorScript from "../collectors/Collect-ADDS.ps1?raw";
+import { AccessWorkbench } from './views/AccessWorkbench.jsx';
 
 const navigation = [
   { id: "overview", label: "Overview", icon: Home24Regular },
@@ -50,7 +51,7 @@ const pageTitles = {
   overview: "Identity posture review",
   findings: "Finding register",
   directory: "Directory inventory",
-  access: "Access investigation",
+  access: "Access explorer & employee reviews",
   compare: "Snapshot comparison",
   tasks: "Guided tasks",
   collection: "Data sources",
@@ -60,7 +61,7 @@ const pageDescriptions = {
   overview: "Review explainable identity signals from the selected snapshot.",
   findings: "Open a finding to inspect affected accounts, evidence, limits, and guidance.",
   directory: "Browse directory accounts and open a profile to understand its access and review signals.",
-  access: "Trace an access problem through sign-in, account, and device evidence without guessing at missing causes.",
+  access: "Trace recorded access paths, inspect account context and prepare an owner-led employee review.",
   compare: "Compare two evidence snapshots using source identifiers and review what changed or was not returned.",
   tasks: "Prepare local review checklists and action plans for an authorized owner to verify.",
   collection: "Connect optional read-only evidence sources and inspect coverage, permissions, and freshness.",
@@ -138,6 +139,7 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [compareSnapshot, setCompareSnapshot] = useState(null);
   const [compareImportError, setCompareImportError] = useState("");
+  const [employeeReviews, setEmployeeReviews] = useState([]);
   const fileInput = useRef(null);
   const msalRef = useRef(null);
   const workspaceGeneration = useRef(0);
@@ -311,12 +313,13 @@ function App() {
       };
 
       const [entra, intune] = await Promise.all([
-        options.includeDirectory || options.includeActivity
+        options.includeDirectory || options.includeActivity || options.includeAccess
           ? collectEntraEvidence({
             getToken,
             includeDirectory: options.includeDirectory,
             includeAccountDetails: options.includeAccountDetails,
             includeActivity: options.includeActivity,
+            includeAccess: options.includeAccess,
             activityDays: options.activityDays,
             tenantId: account.tenantId || options.tenantId,
             signal: controller.signal,
@@ -561,7 +564,7 @@ function App() {
             />
           )}
 
-          {view === "access" && <AccessInvestigationView snapshot={snapshot} principals={principals} />}
+          {view === "access" && <AccessWorkbench snapshot={snapshot} principals={principals} reviews={employeeReviews} onReviews={setEmployeeReviews} />}
 
           {view === "compare" && (
             <CompareView
@@ -590,7 +593,7 @@ function App() {
 
           <footer className="page-footer">
             <span>Evidence-led triage · no automatic remediation</span>
-            <span>KingIdentity Audit · 0.1.1</span>
+            <span>KingIdentity Audit · 0.2.0</span>
           </footer>
         </div>
       </main>

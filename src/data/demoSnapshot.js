@@ -231,3 +231,35 @@ for (const [domainIndex, domain] of demoSnapshot.domains.entries()) {
     }
   }
 }
+
+// Fictional direct edges demonstrate nested membership without asserting that
+// nested application assignment is effective.
+const demoEntra = demoSnapshot.evidenceSources.entra;
+demoEntra.groups.push({id:'entra-group-finance-all',displayName:'Finance Department',description:'Synthetic parent group',groupTypes:[],securityEnabled:true,mailEnabled:false});
+demoEntra.groupMemberships = [
+  {id:'edge-alice-finance',memberId:'entra-user-alice',groupId:'entra-group-finance'},
+  {id:'edge-finance-parent',memberId:'entra-group-finance',groupId:'entra-group-finance-all'},
+  {id:'edge-payroll-legacy',memberId:'entra-user-payroll',groupId:'entra-group-legacy'},
+];
+demoEntra.roleDefinitions = [{id:'definition-security-reader',displayName:'Security Reader'},{id:'definition-global-admin',displayName:'Global Administrator'}];
+demoEntra.roleAssignments = [{id:'assignment-admin',principalId:'entra-user-admin',roleDefinitionId:'definition-global-admin',directoryScopeId:'/',appScopeId:null}];
+demoEntra.applications = [
+  {id:'sp-finance',displayName:'Northstar Finance',appRoles:[{id:'role-finance-reader',displayName:'Finance reader',value:'Reader'}]},
+  {id:'sp-payroll',displayName:'Legacy Payroll Portal',appRoles:[{id:'role-payroll-reader',displayName:'Payroll operator',value:'Operator'}]},
+];
+demoEntra.applicationAssignments = [
+  {id:'assignment-finance',principalId:'entra-group-finance',principalType:'Group',resourceId:'sp-finance',resourceDisplayName:'Northstar Finance',appRoleId:'role-finance-reader'},
+  {id:'assignment-payroll',principalId:'entra-user-payroll',principalType:'User',resourceId:'sp-payroll',resourceDisplayName:'Legacy Payroll Portal',appRoleId:'role-payroll-reader'},
+];
+demoEntra.collectionStatus = Object.fromEntries(['users','groups','directoryRoles','signIns','directoryAudits','groupMemberships','roleDefinitions','roleAssignments','applications','applicationAssignments'].map(key=>[key,'complete']));
+demoEntra.groupCoverage = demoEntra.groups.map(group=>({id:group.id,status:'complete'}));
+demoEntra.applicationCoverage = demoEntra.applications.map(app=>({id:app.id,status:'complete'}));
+demoSnapshot.evidenceSources.intune.collectionStatus = {devices:'complete'};
+const demoDomain = demoSnapshot.domains[0];
+demoDomain.accessEvidence = {
+  groups:[{id:'ad-guid:demo-finance-team',displayName:'Finance Team'},{id:'ad-guid:demo-finance-access',displayName:'Finance File Share Review'}],
+  groupMemberships:[
+    {id:'ad-edge-alice',memberId:`ad-guid:${demoDomain.principals.find(p=>p.accountName==='alice.wu').objectGuid}`,groupId:'ad-guid:demo-finance-team'},
+    {id:'ad-edge-parent',memberId:'ad-guid:demo-finance-team',groupId:'ad-guid:demo-finance-access'},
+  ], collectionStatus:{groups:'complete',groupMemberships:'complete'},collectionWarnings:[],
+};

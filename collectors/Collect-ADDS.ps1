@@ -1,5 +1,5 @@
 #Requires -Modules ActiveDirectory
-# KingIdentity AD DS Collector 0.1.1
+# KingIdentity AD DS Collector 0.2.0
 # This script only issues Get-AD* directory queries and writes a local JSON file.
 [CmdletBinding()]
 param(
@@ -11,7 +11,12 @@ param(
     [string[]]$Domain,
 
     [ValidateRange(1, 3650)]
-    [int]$InactiveAccountDays = 90
+    [int]$InactiveAccountDays = 90,
+
+    [switch]$IncludeAccessMemberships,
+
+    [ValidateRange(1, 1000)]
+    [int]$MaxAccessGroups = 200
 )
 
 Set-StrictMode -Version Latest
@@ -40,6 +45,13 @@ function Get-BooleanValue {
 
     if ($null -eq $Value) { return $false }
     return [bool]$Value
+}
+
+function Get-AccessObjectId {
+    param([object]$Object)
+    if ($Object.ObjectGUID) { return 'ad-guid:' + ([string]$Object.ObjectGUID).ToLowerInvariant() }
+    if ($Object.SID) { return 'ad-sid:' + ([string]$Object.SID).ToLowerInvariant() }
+    return $null
 }
 
 $warnings = [System.Collections.Generic.List[string]]::new()
@@ -224,6 +236,60 @@ foreach ($domainName in $selectedDomains) {
         $warnings.Add("Could not read replication failures for ${domainName}: $($_.Exception.Message)")
     }
 
+    $accessEvidence = $null
+    if ($IncludeAccessMemberships) {
+        $accessGroups = [System.Collections.Generic.List[object]]::new()
+        $accessEdges = [System.Collections.Generic.List[object]]::new()
+        $accessCoverage = [System.Collections.Generic.List[object]]::new()
+        $accessWarnings = [System.Collections.Generic.List[string]]::new()
+        $accessState = 'complete'
+        $groupState = 'complete'
+        try {
+            $rawGroups = @(Get-ADGroup -Filter * -Server $domainName -ResultSetSize ($MaxAccessGroups + 1) -ErrorAction Stop)
+            if ($rawGroups.Count -gt $MaxAccessGroups) {
+                $accessState = 'partial'
+                $groupState = 'partial'
+                $accessWarnings.Add("Group inventory exceeded the selected $MaxAccessGroups group limit in $domainName.")
+            }
+            foreach ($accessGroup in ($rawGroups | Select-Object -First $MaxAccessGroups)) {
+                if ($accessEdges.Count -ge 20000) { $accessState = 'partial'; $groupState = 'partial'; break }
+                $groupId = Get-AccessObjectId $accessGroup
+                if (-not $groupId) { $accessState = 'partial'; continue }
+                $accessGroups.Add([ordered]@{ id = $groupId; displayName = [string]$accessGroup.Name })
+                $memberState = 'complete'
+                try {
+                    # Direct membership retains edges; do not use -Recursive here.
+                    $directMembers = @(Get-ADGroupMember -Identity $accessGroup.ObjectGUID -Server $domainName -ErrorAction Stop)
+                    foreach ($directMember in $directMembers) {
+                        if ($accessEdges.Count -ge 20000) { $memberState = 'partial'; break }
+                        $memberId = Get-AccessObjectId $directMember
+                        if (-not $memberId) { $memberState = 'partial'; continue }
+                        $accessEdges.Add([ordered]@{ id = "${groupId}:${memberId}"; memberId = $memberId; groupId = $groupId })
+                    }
+                }
+                catch {
+                    $memberState = 'failed'
+                    $accessWarnings.Add("Direct membership could not be read for group $($accessGroup.Name) in $domainName.")
+                }
+                if ($memberState -ne 'complete') { $accessState = 'partial' }
+                $accessCoverage.Add([ordered]@{ id = $groupId; status = $memberState })
+            }
+            if ($accessEdges.Count -ge 20000) { $accessWarnings.Add("Access evidence reached the 20,000-edge limit in $domainName.") }
+        }
+        catch {
+            $groupState = 'failed'
+            $accessState = 'failed'
+            $accessWarnings.Add("Access group inventory could not be read in $domainName.")
+        }
+        $accessEvidence = [ordered]@{
+            groups = @($accessGroups)
+            groupMemberships = @($accessEdges)
+            groupCoverage = @($accessCoverage)
+            collectionStatus = [ordered]@{ groups = $groupState; groupMemberships = $accessState }
+            collectionWarnings = @($accessWarnings)
+        }
+    }
+
     $domainReports.Add([ordered]@{
         name = [string]$domainInfo.DNSRoot
         domainMode = [string]$domainInfo.DomainMode
@@ -232,6 +298,7 @@ foreach ($domainName in $selectedDomains) {
         principals = @($principals)
         privilegedGroups = @($privilegedGroups)
         replicationFailures = @($replicationFailures)
+        accessEvidence = $accessEvidence
     })
 }
 
@@ -253,7 +320,7 @@ $report = [ordered]@{
     capturedAt = [datetime]::UtcNow.ToString('o')
     collector = [ordered]@{
         name = 'KingIdentity AD DS Collector'
-        version = '0.1.1'
+        version = '0.2.0'
         inactiveAccountDays = $InactiveAccountDays
         includedDomains = @($selectedDomains)
         mode = 'read-only'

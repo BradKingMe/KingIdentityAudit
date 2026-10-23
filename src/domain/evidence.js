@@ -15,7 +15,7 @@ export function mergeCloudEvidence(snapshot, { entra, intune }) {
     schemaVersion: snapshot.schemaVersion,
     capturedAt: now,
     adSourceMode: "none",
-    collector: { name: "KingIdentity cloud workspace", version: "0.1.1", mode: "read-only", inactiveAccountDays: 90 },
+    collector: { name: "KingIdentity cloud workspace", version: "0.2.0", mode: "read-only", inactiveAccountDays: 90 },
     forest: { name: "No AD DS snapshot collected", rootDomain: null, domains: [], forestMode: null },
     domains: [],
     collectionWarnings: [],

@@ -41,6 +41,7 @@ export function SourcesView({
   const [includeDirectory, setIncludeDirectory] = useState(true);
   const [includeAccountDetails, setIncludeAccountDetails] = useState(false);
   const [includeActivity, setIncludeActivity] = useState(false);
+  const [includeAccess, setIncludeAccess] = useState(false);
   const [includeIntune, setIncludeIntune] = useState(false);
   const [activityDays, setActivityDays] = useState("30");
   const entra = snapshot.evidenceSources?.entra;
@@ -92,9 +93,11 @@ export function SourcesView({
           </div>
           <fieldset className="connector-options">
             <legend>Select evidence to collect</legend>
-            <label><input type="checkbox" checked={includeDirectory} onChange={(event) => setIncludeDirectory(event.target.checked)} /> Entra users, groups, and active directory roles</label>
+            <label><input type="checkbox" checked={includeDirectory || includeAccess} disabled={includeAccess} onChange={(event) => setIncludeDirectory(event.target.checked)} /> Entra users, groups, and active directory roles</label>
             <label><input type="checkbox" checked={includeAccountDetails} disabled={!includeDirectory} onChange={(event) => setIncludeAccountDetails(event.target.checked)} /> Include account state and additional profile fields (User.Read.All; broader read scope)</label>
             <label><input type="checkbox" checked={includeActivity} onChange={(event) => setIncludeActivity(event.target.checked)} /> Sign-in and directory audit logs</label>
+            <label><input type="checkbox" checked={includeAccess} onChange={(event) => { setIncludeAccess(event.target.checked); if (event.target.checked) setIncludeDirectory(true); }} /> Access relationships: direct group edges, active role assignments and app-role assignments (adds Application.Read.All)</label>
+            {includeAccess && <p>Collects up to 100 groups, 50 enterprise apps and 20,000 edges per relationship type. Nested paths are reconstructed locally; hidden memberships and PIM eligibility are excluded. Collection can take several minutes. Clear cloud data to cancel it.</p>}
             {includeActivity && (
               <label className="activity-days-select">Recent activity window
                 <select value={activityDays} onChange={(event) => setActivityDays(event.target.value)}>
@@ -107,8 +110,8 @@ export function SourcesView({
           <div className="connector-actions">
             <Button
               appearance="primary"
-              disabled={isConnecting || !tenantId.trim() || !clientId.trim() || (!includeDirectory && !includeActivity && !includeIntune)}
-              onClick={() => onConnect({ tenantId: tenantId.trim(), clientId: clientId.trim(), includeDirectory, includeAccountDetails, includeActivity, includeIntune, activityDays: Number(activityDays) })}
+              disabled={isConnecting || !tenantId.trim() || !clientId.trim() || (!includeDirectory && !includeActivity && !includeIntune && !includeAccess)}
+              onClick={() => onConnect({ tenantId: tenantId.trim(), clientId: clientId.trim(), includeDirectory: includeDirectory || includeAccess, includeAccountDetails, includeActivity, includeIntune, includeAccess, activityDays: Number(activityDays) })}
             >
               {isConnecting ? "Connecting and collecting…" : "Sign in and collect selected evidence"}
             </Button>
@@ -138,6 +141,7 @@ export function SourcesView({
             <code>&nbsp;&nbsp;-InactiveAccountDays 90</code>
           </div>
           <p className="source-scope-note">To limit collection size, add <code>-Domain contoso.com</code>. Multiple forest DNS names can be supplied as a comma-separated list.</p>
+          <p className="source-scope-note">For direct AD group edges and locally reconstructed nested paths, add <code>-IncludeAccessMemberships</code>. This optional pass reads up to 200 groups per domain (override with <code>-MaxAccessGroups</code>) and retains at most 20,000 membership edges per domain. Primary groups, SID history, trusts and resource ACLs are not collected.</p>
           <div className="collection-actions">
             <Button appearance="secondary" icon={<ArrowDownload24Regular />} onClick={onDownloadCollector}>Download PowerShell collector</Button>
             <Button appearance="secondary" onClick={() => window.print()}>Print source notes</Button>
