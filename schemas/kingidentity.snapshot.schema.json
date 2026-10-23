@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kingidentity:directory-snapshot:1",
+  "title": "KingIdentity workspace snapshot",
+  "type": "object",
+  "required": ["format", "schemaVersion", "capturedAt", "collector", "forest", "domains", "collectionWarnings"],
+  "properties": {
+    "format": { "const": "kingidentity.directory-snapshot" },
+    "schemaVersion": { "const": 1 },
+    "capturedAt": { "type": "string", "format": "date-time" },
+    "collector": {
+      "type": "object",
+      "required": ["name", "version", "inactiveAccountDays", "mode"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "inactiveAccountDays": { "type": "integer", "minimum": 1, "maximum": 3650 },
+        "mode": { "const": "read-only" }
+      },
+      "additionalProperties": true
+    },
+    "forest": {
+      "type": "object",
+      "required": ["name", "rootDomain", "domains", "forestMode"],
+      "properties": {
+        "name": { "type": "string" },
+        "rootDomain": { "type": "string" },
+        "domains": { "type": "array", "items": { "type": "string" } },
+        "forestMode": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "domainMode", "passwordPolicy", "domainControllers", "principals", "privilegedGroups", "replicationFailures"],
+        "properties": {
+          "name": { "type": "string" },
+          "domainMode": { "type": ["string", "null"] },
+          "passwordPolicy": { "type": ["object", "null"] },
+          "domainControllers": { "type": "array" },
+          "principals": { "type": "array" },
+          "privilegedGroups": { "type": "array" },
+          "replicationFailures": { "type": "array" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "collectionWarnings": { "type": "array", "items": { "type": "string" } },
+    "evidenceSources": {
+      "type": "object",
+      "properties": {
+        "entra": {
+          "type": "object",
+          "properties": {
+            "sourceMode": { "enum": ["synthetic", "live"] },
+            "tenantId": { "type": ["string", "null"] },
+            "capturedAt": { "type": ["string", "null"], "format": "date-time" },
+            "activityDays": { "type": ["number", "null"] },
+            "permissions": { "type": "array", "items": { "type": "string" } },
+            "collectionWarnings": { "type": "array", "items": { "type": "string" } },
+            "users": { "type": "array", "items": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" }, "displayName": { "type": ["string", "null"] }, "userPrincipalName": { "type": ["string", "null"] }, "mail": { "type": ["string", "null"] }, "accountEnabled": { "type": ["boolean", "null"] }, "userType": { "type": ["string", "null"] }, "onPremisesSyncEnabled": { "type": ["boolean", "null"] }, "onPremisesImmutableId": { "type": ["string", "null"] }, "department": { "type": ["string", "null"] }, "jobTitle": { "type": ["string", "null"] } }, "additionalProperties": true } },
+            "groups": { "type": "array", "items": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" }, "displayName": { "type": ["string", "null"] }, "description": { "type": ["string", "null"] }, "groupTypes": { "type": "array", "items": { "type": "string" } }, "securityEnabled": { "type": ["boolean", "null"] }, "mailEnabled": { "type": ["boolean", "null"] } }, "additionalProperties": true } },
+            "directoryRoles": { "type": "array", "items": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" }, "displayName": { "type": ["string", "null"] }, "roleTemplateId": { "type": ["string", "null"] } }, "additionalProperties": true } },
+            "signIns": { "type": "array", "items": { "type": "object", "required": ["id", "status", "deviceDetail"], "properties": { "id": { "type": "string" }, "userId": { "type": ["string", "null"] }, "userDisplayName": { "type": ["string", "null"] }, "userPrincipalName": { "type": ["string", "null"] }, "appDisplayName": { "type": ["string", "null"] }, "appId": { "type": ["string", "null"] }, "resourceDisplayName": { "type": ["string", "null"] }, "createdDateTime": { "type": ["string", "null"], "format": "date-time" }, "conditionalAccessStatus": { "type": ["string", "null"] }, "status": { "type": "object", "properties": { "errorCode": { "type": ["number", "null"] }, "failureReason": { "type": ["string", "null"] }, "additionalDetails": { "type": ["string", "null"] } } }, "deviceDetail": { "type": "object", "properties": { "operatingSystem": { "type": ["string", "null"] }, "browser": { "type": ["string", "null"] }, "trustType": { "type": ["string", "null"] }, "isCompliant": { "type": ["boolean", "null"] }, "isManaged": { "type": ["boolean", "null"] } } } }, "additionalProperties": true } },
+            "directoryAudits": { "type": "array", "items": { "type": "object", "required": ["id", "initiatedBy", "targetResources"], "properties": { "id": { "type": "string" }, "activityDateTime": { "type": ["string", "null"], "format": "date-time" }, "activityDisplayName": { "type": ["string", "null"] }, "category": { "type": ["string", "null"] }, "result": { "type": ["string", "null"] }, "correlationId": { "type": ["string", "null"] }, "initiatedBy": { "type": "object", "properties": { "userId": { "type": ["string", "null"] }, "userDisplayName": { "type": ["string", "null"] }, "userPrincipalName": { "type": ["string", "null"] }, "appDisplayName": { "type": ["string", "null"] } } }, "targetResources": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": ["string", "null"] }, "displayName": { "type": ["string", "null"] }, "type": { "type": ["string", "null"] } } } } }, "additionalProperties": true } }
+          },
+          "additionalProperties": true
+        },
+        "intune": {
+          "type": "object",
+          "properties": {
+            "sourceMode": { "enum": ["synthetic", "live"] },
+            "tenantId": { "type": ["string", "null"] },
+            "capturedAt": { "type": ["string", "null"], "format": "date-time" },
+            "permissions": { "type": "array", "items": { "type": "string" } },
+            "collectionWarnings": { "type": "array", "items": { "type": "string" } },
+            "devices": { "type": "array", "items": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" }, "userId": { "type": ["string", "null"] }, "userPrincipalName": { "type": ["string", "null"] }, "userDisplayName": { "type": ["string", "null"] }, "deviceName": { "type": ["string", "null"] }, "azureADDeviceId": { "type": ["string", "null"] }, "managementState": { "type": ["string", "null"] }, "complianceState": { "type": ["string", "null"] }, "operatingSystem": { "type": ["string", "null"] }, "osVersion": { "type": ["string", "null"] }, "lastSyncDateTime": { "type": ["string", "null"], "format": "date-time" }, "deviceRegistrationState": { "type": ["string", "null"] }, "isEncrypted": { "type": ["boolean", "null"] }, "managedDeviceOwnerType": { "type": ["string", "null"] } }, "additionalProperties": true } }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

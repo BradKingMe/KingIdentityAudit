@@ -1,0 +1,12 @@
+minimumReleaseAgeExclude:
+  - '@fluentui/react-breadcrumb@9.4.8'
+  - '@fluentui/react-button@9.11.3'
+  - '@fluentui/react-carousel@9.9.16'
+  - '@fluentui/react-color-picker@9.3.3'
+  - '@fluentui/react-components@9.74.11'
+  - '@fluentui/react-message-bar@9.7.9'
+  - '@fluentui/react-nav@9.4.9'
+  - '@fluentui/react-slider@9.6.8'
+  - '@fluentui/react-teaching-popover@9.7.9'
+  - '@fluentui/react-toolbar@9.8.7'
+  - '@fluentui/react-tree@9.16.10'

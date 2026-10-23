@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+recovery/
+exports/
+*.snapshot.json
+*.report.json
+.env*
+!.env.example
+.DS_Store
+Thumbs.db
+
+# Local workflow state
+.unlazy/
