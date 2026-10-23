@@ -2,7 +2,7 @@ import { fetchGraphCollection, graphQueryPath } from "./graphClient.js";
 
 export const INTUNE_READ_SCOPES = ["DeviceManagementManagedDevices.Read.All"];
 
-export async function collectIntuneEvidence({ getToken, tenantId = null }) {
+export async function collectIntuneEvidence({ getToken, tenantId = null, signal }) {
   const warnings = [];
   const evidence = {
     tenantId: typeof tenantId === "string" ? tenantId : null,
@@ -10,6 +10,7 @@ export async function collectIntuneEvidence({ getToken, tenantId = null }) {
     permissions: INTUNE_READ_SCOPES,
     devices: [],
     collectionWarnings: warnings,
+    collectionStatus: { devices: "failed" },
   };
 
   try {
@@ -18,7 +19,8 @@ export async function collectIntuneEvidence({ getToken, tenantId = null }) {
       "$select": "id,userId,userPrincipalName,userDisplayName,deviceName,azureADDeviceId,managementState,complianceState,operatingSystem,osVersion,lastSyncDateTime,deviceRegistrationState,isEncrypted,managedDeviceOwnerType",
       "$top": "999",
     });
-    const result = await fetchGraphCollection(accessToken, path, { maxItems: 10_000 });
+    const result = await fetchGraphCollection(accessToken, path, { maxItems: 10_000, signal });
+    evidence.collectionStatus.devices = result.truncated ? "partial" : "complete";
     evidence.devices = result.records.filter((device) => typeof device.id === "string").map((device) => ({
       id: device.id,
       userId: typeof device.userId === "string" ? device.userId : null,

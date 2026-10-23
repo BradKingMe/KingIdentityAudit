@@ -1,11 +1,13 @@
+import { sameTenant } from "./identity.js";
+
 const text = (value) => value == null ? "" : String(value);
 
 function flattenAD(snapshot) {
   return (snapshot?.domains || []).flatMap((domain) => (domain.principals || []).map((principal) => ({
     id: principal.objectGuid
-      ? `ad-guid:${principal.objectGuid}`
+      ? `ad-guid:${principal.objectGuid.toLowerCase()}`
       : principal.objectSid
-        ? `ad-sid:${snapshot?.forest?.name || "unknown-forest"}:${principal.objectSid}`
+        ? `ad-sid:${snapshot?.forest?.name?.toLowerCase() || "unknown-forest"}:${principal.objectSid.toLowerCase()}`
         : `ad-name:${domain.name}:${principal.objectClass}:${principal.accountName}`,
     matchQuality: principal.objectGuid || principal.objectSid ? "stable AD identifier" : "domain and account-name fallback",
     name: principal.accountName || "Unnamed principal",
@@ -26,7 +28,7 @@ function flattenAD(snapshot) {
 
 function fromCollection(rows, fields, label) {
   return (rows || []).filter((row) => typeof row.id === "string").map((row) => ({
-    id: row.id,
+    id: row.id.toLowerCase(),
     matchQuality: "source object ID",
     name: row.displayName || row.userPrincipalName || row.deviceName || row.id,
     scope: label,
@@ -38,13 +40,34 @@ function collections(snapshot) {
   const sources = snapshot?.evidenceSources || {};
   const entra = sources.entra;
   const intune = sources.intune;
-  return [
+  const rows = [
     { key: "ad-principals", label: "AD DS principals", rows: flattenAD(snapshot), available: Boolean(snapshot?.domains?.length) },
     { key: "entra-users", label: "Entra users", rows: fromCollection(entra?.users, ["displayName", "userPrincipalName", "mail", "accountEnabled", "userType", "onPremisesSyncEnabled", "department", "jobTitle"], "Entra ID"), available: Array.isArray(entra?.users) },
     { key: "entra-groups", label: "Entra groups", rows: fromCollection(entra?.groups, ["displayName", "description", "groupTypes", "securityEnabled", "mailEnabled"], "Entra ID"), available: Array.isArray(entra?.groups) },
     { key: "entra-roles", label: "Activated Entra directory roles", rows: fromCollection(entra?.directoryRoles, ["displayName", "roleTemplateId"], "Entra ID"), available: Array.isArray(entra?.directoryRoles) },
     { key: "intune-devices", label: "Intune managed devices", rows: fromCollection(intune?.devices, ["deviceName", "userId", "userPrincipalName", "complianceState", "managementState", "operatingSystem", "osVersion", "lastSyncDateTime", "deviceRegistrationState", "isEncrypted"], "Intune"), available: Array.isArray(intune?.devices) },
   ];
+  return rows.map((collection) => {
+    const source = collection.key.startsWith("entra-") ? entra : collection.key === "intune-devices" ? intune : null;
+    const key = { "entra-users": "users", "entra-groups": "groups", "entra-roles": "directoryRoles", "intune-devices": "devices" }[collection.key];
+    return { ...collection, source, status: source?.collectionStatus?.[key] };
+  });
+}
+
+function comparisonLimit(current, previous, currentSnapshot, previousSnapshot) {
+  if (!previous?.available || !current.available) return "One snapshot did not collect this inventory.";
+  if (current.key === "ad-principals") {
+    const scope = (snapshot) => JSON.stringify([snapshot.forest?.name?.toLowerCase(), snapshot.domains.map((domain) => domain.name.toLowerCase()).sort()]);
+    if (!currentSnapshot.forest?.name || !previousSnapshot.forest?.name || scope(currentSnapshot) !== scope(previousSnapshot)) return "AD forest or domain collection scope differs; inventories are not compared.";
+    if ((currentSnapshot.adSourceMode === "synthetic") !== (previousSnapshot.adSourceMode === "synthetic")) return "Synthetic and real AD evidence cannot be compared.";
+    if (currentSnapshot.collectionWarnings?.length || previousSnapshot.collectionWarnings?.length) return "An AD collection has coverage warnings; a reliable inventory comparison is unavailable.";
+  } else {
+    if (!sameTenant(current.source, previous.source)) return "Microsoft tenant IDs differ or are missing; inventories are not compared.";
+    if (current.key === "entra-users" && Boolean(current.source.permissions?.includes("User.Read.All")) !== Boolean(previous.source.permissions?.includes("User.Read.All"))) return "User profile permission scope differs; missing fields are not treated as account changes.";
+    if ((current.source.sourceMode === "synthetic") !== (previous.source.sourceMode === "synthetic")) return "Synthetic and live cloud evidence cannot be compared.";
+    if ([current, previous].some((collection) => collection.status ? collection.status !== "complete" : collection.source?.collectionWarnings?.length)) return "One collection failed, was partial, or was not selected; absence is not a reliable inventory change.";
+  }
+  return null;
 }
 
 function displayValue(value) {
@@ -55,13 +78,15 @@ function displayValue(value) {
 }
 
 export function compareWorkspaceSnapshots(current, previous, limit = 200) {
+  const previousCollections = collections(previous);
   return collections(current).map((currentCollection) => {
-    const previousCollection = collections(previous).find((item) => item.key === currentCollection.key);
-    if (!previousCollection?.available || !currentCollection.available) {
+    const previousCollection = previousCollections.find((item) => item.key === currentCollection.key);
+    const reason = comparisonLimit(currentCollection, previousCollection, current, previous);
+    if (reason) {
       return {
         ...currentCollection,
         comparable: false,
-        reason: !previousCollection?.available ? "The earlier snapshot did not include this source." : "The current snapshot did not include this source.",
+        reason,
         added: 0,
         removed: 0,
         changed: 0,
@@ -119,9 +144,10 @@ export function compareWorkspaceSnapshots(current, previous, limit = 200) {
 export function matchEntraUser(subject, entraUsers = []) {
   if (!subject) return { user: null, method: "none", ambiguous: false };
   if (subject.id) {
-    const byId = entraUsers.filter((user) => user.id === subject.id);
+    const byId = entraUsers.filter((user) => user.id.toLowerCase() === subject.id.toLowerCase());
     if (byId.length === 1) return { user: byId[0], method: "Entra object ID", ambiguous: false };
     if (byId.length > 1) return { user: null, method: "Entra object ID", ambiguous: true };
+    return { user: null, method: "Entra object ID not returned", ambiguous: false };
   }
   const upn = (subject.userPrincipalName || "").trim().toLocaleLowerCase();
   if (!upn) return { user: null, method: "no stable match", ambiguous: false };

@@ -29,6 +29,8 @@ import { createWorkspaceSnapshot, parseSnapshotText } from "./domain/snapshot.js
 import { demoSnapshot } from "./data/demoSnapshot.js";
 import { formatDate, formatRelativeDays } from "./domain/snapshot.js";
 import { matchEntraUser } from "./domain/workspace.js";
+import { matchesEntraIdentity, sameADPrincipal, sameTenant } from "./domain/identity.js";
+import { mergeCloudEvidence } from "./domain/evidence.js";
 import { collectEntraEvidence } from "./connectors/entra.js";
 import { collectIntuneEvidence } from "./connectors/intune.js";
 import { AccessInvestigationView, CompareView, SourcesView, TasksView } from "./views/EnterpriseViews.jsx";
@@ -102,9 +104,7 @@ function principalKey(principal) {
 }
 
 function samePrincipal(left, right) {
-  if (left.objectGuid && right.objectGuid) return left.objectGuid === right.objectGuid;
-  if (left.objectSid && right.objectSid) return left.objectSid === right.objectSid;
-  return left.accountName === right.accountName && left.objectClass === right.objectClass;
+  return sameADPrincipal(left, right);
 }
 
 function isTenantSelector(value) {
@@ -140,6 +140,11 @@ function App() {
   const [compareImportError, setCompareImportError] = useState("");
   const fileInput = useRef(null);
   const msalRef = useRef(null);
+  const workspaceGeneration = useRef(0);
+  const connectionInProgress = useRef(false);
+  const connectionAbort = useRef(null);
+  const importGeneration = useRef(0);
+  const comparisonImportGeneration = useRef(0);
 
   const findings = useMemo(() => buildFindings(snapshot), [snapshot]);
   const counts = useMemo(() => {
@@ -189,17 +194,26 @@ function App() {
   );
 
   async function handleImport(event) {
-    const file = event.currentTarget.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+    const generation = ++importGeneration.current;
     setImportError("");
     if (file.size > 25 * 1024 * 1024) {
       setImportError("That file is larger than the 25 MB import limit.");
-      event.currentTarget.value = "";
+      input.value = "";
       return;
     }
     try {
       const parsed = parseSnapshotText(await file.text());
+      if (generation !== importGeneration.current) return;
+      workspaceGeneration.current += 1;
+      connectionAbort.current?.abort();
       setSnapshot(parsed);
+      setSelectedFinding(null);
+      setCompareSnapshot(null);
+      comparisonImportGeneration.current += 1;
+      setCompareImportError("");
       setDatasetLabel(file.name);
       setSearch("");
       setSeverityFilter("all");
@@ -207,13 +221,17 @@ function App() {
       setSelectedPrincipalKey(null);
       setView("overview");
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "The selected snapshot could not be read.");
+      if (generation === importGeneration.current) setImportError(error instanceof Error ? error.message : "The selected snapshot could not be read.");
     } finally {
-      event.currentTarget.value = "";
+      input.value = "";
     }
   }
 
   function restoreDemo() {
+    workspaceGeneration.current += 1;
+    connectionAbort.current?.abort();
+    importGeneration.current += 1;
+    comparisonImportGeneration.current += 1;
     setSnapshot(demoSnapshot);
     setDatasetLabel("Synthetic demo environment");
     setImportError("");
@@ -227,6 +245,11 @@ function App() {
   }
 
   async function connectMicrosoftSources(options) {
+    if (connectionInProgress.current) return;
+    connectionInProgress.current = true;
+    const generation = workspaceGeneration.current;
+    const controller = new AbortController();
+    connectionAbort.current = controller;
     setConnectorError("");
     setIsConnecting(true);
     try {
@@ -243,7 +266,7 @@ function App() {
             auth: {
               clientId: options.clientId,
               authority: `https://login.microsoftonline.com/${encodeURIComponent(options.tenantId)}`,
-              redirectUri: window.location.origin,
+              redirectUri: new URL("redirect.html", window.location.href).href,
             },
             cache: { cacheLocation: "memoryStorage" },
           }),
@@ -258,6 +281,7 @@ function App() {
       // Establish the operator session first. Graph permissions are acquired per source below,
       // so optional consent failures do not prevent the other selected evidence from loading.
       const login = await instance.loginPopup({ prompt: "select_account" });
+      controller.signal.throwIfAborted();
       const account = login.account;
       if (!account) throw new Error("Microsoft sign-in completed without returning an account.");
       const tokenRequests = new Map();
@@ -266,12 +290,15 @@ function App() {
         const key = [...scopes].sort().join(" ");
         if (!tokenRequests.has(key)) {
           const request = tokenQueue.then(async () => {
+            controller.signal.throwIfAborted();
             try {
               const result = await instance.acquireTokenSilent({ scopes, account });
+              controller.signal.throwIfAborted();
               return result.accessToken;
             } catch (error) {
               if (!(error instanceof InteractionRequiredAuthError)) throw error;
               const result = await instance.acquireTokenPopup({ scopes, account });
+              controller.signal.throwIfAborted();
               return result.accessToken;
             }
           });
@@ -292,32 +319,34 @@ function App() {
             includeActivity: options.includeActivity,
             activityDays: options.activityDays,
             tenantId: account.tenantId || options.tenantId,
+            signal: controller.signal,
           })
           : Promise.resolve(null),
         options.includeIntune
-          ? collectIntuneEvidence({ getToken, tenantId: account.tenantId || options.tenantId })
+          ? collectIntuneEvidence({ getToken, tenantId: account.tenantId || options.tenantId, signal: controller.signal })
           : Promise.resolve(null),
       ]);
 
-      setSnapshot((current) => ({
-        ...current,
-        evidenceSources: {
-          ...(current.evidenceSources || {}),
-          ...(entra ? { entra: { ...entra, sourceMode: "live" } } : {}),
-          ...(intune ? { intune: { ...intune, sourceMode: "live" } } : {}),
-        },
-      }));
+      if (generation !== workspaceGeneration.current) return;
+      setSnapshot((current) => mergeCloudEvidence(current, { entra, intune }));
+      setSelectedFinding(null);
+      setSelectedPrincipalKey(null);
     } catch (error) {
+      if (generation !== workspaceGeneration.current) return;
       const authError = error?.name?.includes("AuthError") || error?.name?.includes("BrowserAuthError");
       setConnectorError(authError
         ? "Microsoft sign-in or consent could not be completed. Check the tenant, client ID, SPA redirect URI, and delegated admin consent."
         : error instanceof Error ? error.message : "The Microsoft connector could not start.");
     } finally {
+      connectionInProgress.current = false;
+      if (connectionAbort.current === controller) connectionAbort.current = null;
       setIsConnecting(false);
     }
   }
 
   function clearCloudEvidence() {
+    workspaceGeneration.current += 1;
+    connectionAbort.current?.abort();
     msalRef.current = null;
     setSnapshot((current) => {
       const evidenceSources = { ...(current.evidenceSources || {}) };
@@ -342,20 +371,23 @@ function App() {
   }
 
   async function handleCompareImport(event) {
-    const file = event.currentTarget.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+    const generation = ++comparisonImportGeneration.current;
     setCompareImportError("");
     if (file.size > 25 * 1024 * 1024) {
       setCompareImportError("That file is larger than the 25 MB comparison limit.");
-      event.currentTarget.value = "";
+      input.value = "";
       return;
     }
     try {
-      setCompareSnapshot(parseSnapshotText(await file.text()));
+      const parsed = parseSnapshotText(await file.text());
+      if (generation === comparisonImportGeneration.current) setCompareSnapshot(parsed);
     } catch (error) {
-      setCompareImportError(error instanceof Error ? error.message : "The earlier workspace snapshot could not be read.");
+      if (generation === comparisonImportGeneration.current) setCompareImportError(error instanceof Error ? error.message : "The earlier workspace snapshot could not be read.");
     } finally {
-      event.currentTarget.value = "";
+      input.value = "";
     }
   }
 
@@ -376,7 +408,8 @@ function App() {
   }
 
   const priorityFindings = findings.filter((finding) => finding.severity !== "info").slice(0, 5);
-  const isDemo = datasetLabel === "Synthetic demo environment";
+  const isDemo = snapshot.adSourceMode === "synthetic";
+  const shownDatasetLabel = snapshot.adSourceMode === "none" ? "Microsoft cloud workspace" : datasetLabel;
   const taskSubjects = useMemo(() => [
     ...principals.map((principal) => ({
       key: `ad:${principalKey(principal)}`,
@@ -462,7 +495,7 @@ function App() {
             <div className="snapshot-indicator"><span className="snapshot-dot" /> {isDemo ? "SYNTHETIC DATA" : "LOCAL SNAPSHOT"}</div>
             <div className="snapshot-details">
               <span className="snapshot-label">Source</span>
-              <strong title={datasetLabel}>{datasetLabel}</strong>
+              <strong title={shownDatasetLabel}>{shownDatasetLabel}</strong>
               <span className="snapshot-divider" />
               <span className="snapshot-label">Forest</span>
               <strong>{snapshot.forest?.name || "Unknown forest"}</strong>
@@ -470,7 +503,7 @@ function App() {
               <span className="snapshot-label">Captured</span>
               <strong>{formatDate(snapshot.capturedAt, { withTime: true })}</strong>
             </div>
-            {!isDemo && <Button appearance="subtle" size="small" onClick={restoreDemo}>Restore demo</Button>}
+            {snapshot !== demoSnapshot && <Button appearance="subtle" size="small" onClick={restoreDemo}>Restore demo</Button>}
           </section>
 
           {importError && (
@@ -535,7 +568,7 @@ function App() {
               current={snapshot}
               baseline={compareSnapshot}
               onBaseline={handleCompareImport}
-              onClearBaseline={() => { setCompareSnapshot(null); setCompareImportError(""); }}
+              onClearBaseline={() => { comparisonImportGeneration.current += 1; setCompareSnapshot(null); setCompareImportError(""); }}
               importError={compareImportError}
             />
           )}
@@ -557,7 +590,7 @@ function App() {
 
           <footer className="page-footer">
             <span>Evidence-led triage · no automatic remediation</span>
-            <span>KingIdentity Audit · 0.1.0</span>
+            <span>KingIdentity Audit · 0.1.1</span>
           </footer>
         </div>
       </main>
@@ -577,8 +610,9 @@ function App() {
                 <p>{selectedFinding.summary}</p>
                 <h3>Evidence in this snapshot</h3>
                 <ul className="evidence-list">
-                  {selectedFinding.evidence.map((item, index) => <li key={`${selectedFinding.id}-${index}`}>{item}</li>)}
+                  {selectedFinding.evidence.slice(0, 200).map((item, index) => <li key={`${selectedFinding.id}-${index}`}>{item}</li>)}
                 </ul>
+                {selectedFinding.evidence.length > 200 && <p>Showing 200 of {selectedFinding.evidence.length} evidence items. Use Directory search or the workspace export to inspect the remaining records.</p>}
                 <h3>Recommended review</h3>
                 <p>{selectedFinding.recommendation}</p>
                 <div className="limitation-box">
@@ -736,14 +770,14 @@ function IdentityProfile({ principal, domain, capturedAt, findings, evidenceSour
   );
   const relatedFindings = findings.filter((finding) =>
     finding.domain === principal.domain &&
-    (finding.affected || []).some((affected) => samePrincipal(affected, principal))
+    (finding.affected || []).some((affected) => samePrincipal(affected, principal) ||
+      (finding.category !== "Privilege inventory" && !affected.objectGuid && !affected.objectSid &&
+        affected.accountName === principal.accountName && affected.objectClass === principal.objectClass))
   );
   const entraMatch = matchEntraUser(principal, evidenceSources?.entra?.users || []);
   const entraUser = entraMatch.user;
-  const principalUpn = (principal.userPrincipalName || "").trim().toLocaleLowerCase();
   const relatedDevices = (evidenceSources?.intune?.devices || []).filter((device) =>
-    (entraUser?.id && device.userId === entraUser.id) ||
-    (principalUpn && (device.userPrincipalName || "").trim().toLocaleLowerCase() === principalUpn)
+    sameTenant(evidenceSources?.entra, evidenceSources?.intune) && matchesEntraIdentity(device, entraUser)
   );
 
   return (
@@ -822,7 +856,7 @@ function IdentityProfile({ principal, domain, capturedAt, findings, evidenceSour
           ) : (
             <p className="identity-empty">No membership in the selected privileged groups was returned. Check collection warnings and scope.</p>
           )}
-          <p className="identity-limit">The collector expands nested membership to identify effective members, but this snapshot does not retain every nested-group hop.</p>
+          <p className="identity-limit">Membership matches require an AD object GUID or SID. Older snapshots without member identifiers cannot establish profile membership. The collector does not retain every nested-group hop.</p>
         </section>
       </div>
 
@@ -844,6 +878,11 @@ function IdentityProfile({ principal, domain, capturedAt, findings, evidenceSour
 }
 
 function DirectoryView({ principals, search, onSearch, accountFilter, onAccountFilter, snapshot, findings, selectedPrincipalKey, onSelectPrincipal, onSelectFinding }) {
+  const [page, setPage] = useState(0);
+  const pageSize = 100;
+  const pageCount = Math.max(1, Math.ceil(principals.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const displayedPrincipals = principals.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const filters = [["all", "All accounts"], ["enabled", "Enabled"], ["disabled", "Disabled"]];
   return (
     <>
@@ -862,12 +901,12 @@ function DirectoryView({ principals, search, onSearch, accountFilter, onAccountF
             contentBefore={<Search24Regular />}
             placeholder="Search account, domain, or SPN"
             value={search}
-            onChange={(_, data) => onSearch(data.value)}
+            onChange={(_, data) => { setPage(0); onSearch(data.value); }}
             aria-label="Search directory principals"
           />
           <div className="filter-pills" role="group" aria-label="Filter accounts by status">
             {filters.map(([value, label]) => (
-              <Button key={value} size="small" appearance={accountFilter === value ? "primary" : "subtle"} onClick={() => onAccountFilter(value)} aria-pressed={accountFilter === value}>
+              <Button key={value} size="small" appearance={accountFilter === value ? "primary" : "subtle"} onClick={() => { setPage(0); onAccountFilter(value); }} aria-pressed={accountFilter === value}>
                 {label}
               </Button>
             ))}
@@ -878,7 +917,7 @@ function DirectoryView({ principals, search, onSearch, accountFilter, onAccountF
             <table className="data-table directory-table">
               <thead><tr><th scope="col">Account</th><th scope="col">Type</th><th scope="col">State</th><th scope="col">Last replicated logon</th><th scope="col">Review flags</th></tr></thead>
               <tbody>
-                {principals.map((principal, index) => {
+                {displayedPrincipals.map((principal, index) => {
                   const flags = [];
                   if (principal.trustedForDelegation) flags.push("Delegation");
                   if (principal.passwordNeverExpires) flags.push("Never expires");
@@ -932,6 +971,12 @@ function DirectoryView({ principals, search, onSearch, accountFilter, onAccountF
           <div className="empty-state compact-empty"><strong>No accounts match this view</strong><span>Clear the search or change the account state filter.</span></div>
         )}
       </section>
+
+      {principals.length > pageSize && <nav className="table-pagination" aria-label="Directory pages">
+        <Button appearance="secondary" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous accounts</Button>
+        <span>Accounts {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, principals.length)} of {principals.length}</span>
+        <Button appearance="secondary" disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)}>Next accounts</Button>
+      </nav>}
 
       <section className="inventory-lower-grid">
         {snapshot.domains.map((domain) => (

@@ -12,3 +12,5 @@ Thumbs.db
 
 # Local workflow state
 .unlazy/
+test-results/
+playwright-report/

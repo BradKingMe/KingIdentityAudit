@@ -7,6 +7,7 @@
   "properties": {
     "format": { "const": "kingidentity.directory-snapshot" },
     "schemaVersion": { "const": 1 },
+    "adSourceMode": { "enum": ["synthetic", "imported", "none"] },
     "capturedAt": { "type": "string", "format": "date-time" },
     "collector": {
       "type": "object",
@@ -24,7 +25,7 @@
       "required": ["name", "rootDomain", "domains", "forestMode"],
       "properties": {
         "name": { "type": "string" },
-        "rootDomain": { "type": "string" },
+        "rootDomain": { "type": ["string", "null"] },
         "domains": { "type": "array", "items": { "type": "string" } },
         "forestMode": { "type": ["string", "null"] }
       },
@@ -40,8 +41,8 @@
           "domainMode": { "type": ["string", "null"] },
           "passwordPolicy": { "type": ["object", "null"] },
           "domainControllers": { "type": "array" },
-          "principals": { "type": "array" },
-          "privilegedGroups": { "type": "array" },
+          "principals": { "type": "array", "items": { "$ref": "#/$defs/principal" } },
+          "privilegedGroups": { "type": "array", "items": { "type": "object", "required": ["name", "members"], "properties": { "name": { "type": "string" }, "scope": { "type": ["string", "null"] }, "members": { "type": "array", "items": { "$ref": "#/$defs/member" } } } } },
           "replicationFailures": { "type": "array" }
         },
         "additionalProperties": true
@@ -54,7 +55,8 @@
         "entra": {
           "type": "object",
           "properties": {
-            "sourceMode": { "enum": ["synthetic", "live"] },
+            "sourceMode": { "enum": ["synthetic", "live", "imported"] },
+            "collectionStatus": { "$ref": "#/$defs/entraStatus" },
             "tenantId": { "type": ["string", "null"] },
             "capturedAt": { "type": ["string", "null"], "format": "date-time" },
             "activityDays": { "type": ["number", "null"] },
@@ -71,7 +73,8 @@
         "intune": {
           "type": "object",
           "properties": {
-            "sourceMode": { "enum": ["synthetic", "live"] },
+            "sourceMode": { "enum": ["synthetic", "live", "imported"] },
+            "collectionStatus": { "$ref": "#/$defs/intuneStatus" },
             "tenantId": { "type": ["string", "null"] },
             "capturedAt": { "type": ["string", "null"], "format": "date-time" },
             "permissions": { "type": "array", "items": { "type": "string" } },
@@ -84,5 +87,28 @@
       "additionalProperties": true
     }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$defs": {
+    "collectionState": { "enum": ["complete", "partial", "failed", "not-selected"] },
+    "entraStatus": { "type": "object", "propertyNames": { "enum": ["users", "groups", "directoryRoles", "signIns", "directoryAudits"] }, "additionalProperties": { "$ref": "#/$defs/collectionState" } },
+    "intuneStatus": { "type": "object", "propertyNames": { "const": "devices" }, "additionalProperties": { "$ref": "#/$defs/collectionState" } },
+    "member": {
+      "type": "object", "required": ["accountName", "objectClass"],
+      "properties": {
+        "accountName": { "type": "string" }, "objectClass": { "type": "string" },
+        "objectGuid": { "type": ["string", "null"] }, "objectSid": { "type": ["string", "null"] }, "enabled": { "type": ["boolean", "null"] }
+      }
+    },
+    "principal": {
+      "allOf": [{ "$ref": "#/$defs/member" }],
+      "type": "object",
+      "properties": {
+        "userPrincipalName": { "type": ["string", "null"] }, "isDomainController": { "type": ["boolean", "null"] },
+        "lastLogonDate": { "type": ["string", "null"], "format": "date-time" },
+        "passwordNeverExpires": { "type": ["boolean", "null"] }, "trustedForDelegation": { "type": ["boolean", "null"] },
+        "accountNotDelegated": { "type": ["boolean", "null"] }, "adminCount": { "type": ["boolean", "null"] },
+        "servicePrincipalNames": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
 }

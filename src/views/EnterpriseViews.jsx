@@ -4,11 +4,26 @@ import { ArrowDownload24Regular, ShieldCheckmark24Regular } from "@fluentui/reac
 import { formatDate } from "../domain/snapshot.js";
 import { compareWorkspaceSnapshots, explainSignIn } from "../domain/workspace.js";
 import { createReviewPlan, REVIEW_TEMPLATES } from "../domain/reviewPlans.js";
+import { matchesEntraIdentity, sameTenant } from "../domain/identity.js";
 
-const sourceCount = (value) => Array.isArray(value) ? value.length : 0;
+const sourceCount = (source, key) => {
+  const status = source?.collectionStatus?.[key];
+  if (!source || status === "not-selected") return "Not collected";
+  if (status === "failed") return "Failed";
+  return `${Array.isArray(source[key]) ? source[key].length : 0}${status === "partial" ? "+ (partial)" : ""}`;
+};
 
 function SourceStatus({ label, status, color = "subtle" }) {
   return <div className="source-status-row"><span>{label}</span><Badge appearance="outline" color={color}>{status}</Badge></div>;
+}
+
+function cloudStatus(source) {
+  if (!source) return "Not collected";
+  if (source.sourceMode === "synthetic") return "Synthetic data";
+  const selected = Object.values(source.collectionStatus || {}).filter((status) => status !== "not-selected");
+  if (selected.length && selected.every((status) => status === "failed")) return "Collection failed";
+  if (source.collectionWarnings?.length) return "Partial snapshot";
+  return source.sourceMode === "imported" ? "Imported snapshot" : "Connected snapshot";
 }
 
 export function SourcesView({
@@ -30,7 +45,7 @@ export function SourcesView({
   const [activityDays, setActivityDays] = useState("30");
   const entra = snapshot.evidenceSources?.entra;
   const intune = snapshot.evidenceSources?.intune;
-  const isDemo = datasetLabel === "Synthetic demo environment";
+  const isDemo = snapshot.adSourceMode === "synthetic";
   const forestDomains = Array.isArray(snapshot.forest?.domains) ? snapshot.forest.domains.length : snapshot.domains.length;
   const includedDomains = Array.isArray(snapshot.collector?.includedDomains)
     ? snapshot.collector.includedDomains
@@ -46,16 +61,16 @@ export function SourcesView({
           </div>
         </div>
         <div className="source-status-list" aria-label="Enterprise evidence sources">
-          <SourceStatus label="Active Directory Domain Services" status={isDemo ? "Synthetic data" : "Snapshot loaded"} color="success" />
-          <SourceStatus label="Microsoft Entra ID" status={entra ? (entra.sourceMode === "synthetic" ? "Synthetic data" : entra.collectionWarnings?.length ? "Partial snapshot" : "Connected snapshot") : "Not collected"} color={entra?.collectionWarnings?.length ? "warning" : entra ? "success" : "subtle"} />
-          <SourceStatus label="Intune managed devices" status={intune ? (intune.sourceMode === "synthetic" ? "Synthetic data" : intune.collectionWarnings?.length ? "Partial snapshot" : "Connected snapshot") : "Not collected"} color={intune?.collectionWarnings?.length ? "warning" : intune ? "success" : "subtle"} />
+          <SourceStatus label="Active Directory Domain Services" status={!snapshot.domains.length ? "Not collected" : isDemo ? "Synthetic data" : snapshot.collectionWarnings?.length ? "Snapshot with warnings" : "Snapshot loaded"} color={snapshot.collectionWarnings?.length ? "warning" : snapshot.domains.length ? "success" : "subtle"} />
+          <SourceStatus label="Microsoft Entra ID" status={cloudStatus(entra)} color={entra?.collectionWarnings?.length ? "warning" : entra ? "success" : "subtle"} />
+          <SourceStatus label="Intune managed devices" status={cloudStatus(intune)} color={intune?.collectionWarnings?.length ? "warning" : intune ? "success" : "subtle"} />
           <SourceStatus label="HR and asset records" status="Not connected" />
         </div>
 
         <div className="connector-setup">
           <div className="section-kicker">OPTIONAL MICROSOFT GRAPH CONNECTOR</div>
           <h3>Connect a tenant for a read-only collection</h3>
-          <p>Register a Single-page application in Microsoft Entra. Enter its public application ID and the tenant ID here; neither value is saved. Do not enter a client secret.</p>
+          <p>Register a Single-page application in Microsoft Entra with <code>{new URL("redirect.html", window.location.href).href}</code> as its redirect URI. Enter its public application ID and the tenant ID here; neither value is saved. Live collection replaces synthetic evidence and removes cloud sources from other tenants.</p>
           {connectorError && <MessageBar intent="error" className="import-message"><MessageBarBody>{connectorError}</MessageBarBody></MessageBar>}
           {entra?.collectionWarnings?.length > 0 && (
             <MessageBar intent="warning" className="import-message">
@@ -135,9 +150,9 @@ export function SourcesView({
         <dl className="coverage-details">
           <div><dt>AD domains returned</dt><dd>{snapshot.domains.length} / {forestDomains}</dd></div>
           <div><dt>AD collection warnings</dt><dd>{snapshot.collectionWarnings?.length || 0}</dd></div>
-          <div><dt>Entra users / groups / roles</dt><dd>{sourceCount(entra?.users)} / {sourceCount(entra?.groups)} / {sourceCount(entra?.directoryRoles)}</dd></div>
-          <div><dt>Entra sign-ins / audits</dt><dd>{sourceCount(entra?.signIns)} / {sourceCount(entra?.directoryAudits)}</dd></div>
-          <div><dt>Intune devices</dt><dd>{sourceCount(intune?.devices)}</dd></div>
+          <div><dt>Entra users / groups / roles</dt><dd>{sourceCount(entra, "users")} / {sourceCount(entra, "groups")} / {sourceCount(entra, "directoryRoles")}</dd></div>
+          <div><dt>Entra sign-ins / audits</dt><dd>{sourceCount(entra, "signIns")} / {sourceCount(entra, "directoryAudits")}</dd></div>
+          <div><dt>Intune devices</dt><dd>{sourceCount(intune, "devices")}</dd></div>
           <div><dt>AD snapshot captured</dt><dd>{formatDate(snapshot.capturedAt, { withTime: true })}</dd></div>
           {entra?.capturedAt && <div><dt>Entra snapshot captured</dt><dd>{formatDate(entra.capturedAt, { withTime: true })}</dd></div>}
           {intune?.capturedAt && <div><dt>Intune snapshot captured</dt><dd>{formatDate(intune.capturedAt, { withTime: true })}</dd></div>}
@@ -156,17 +171,13 @@ export function AccessInvestigationView({ snapshot, principals }) {
   const [userId, setUserId] = useState("");
   const [signInId, setSignInId] = useState("");
   const selectedUser = users.find((user) => user.id === userId) || null;
-  const userEvents = useMemo(() => events.filter((event) =>
-    (selectedUser?.id && event.userId === selectedUser.id) ||
-    (selectedUser?.userPrincipalName && (event.userPrincipalName || "").toLocaleLowerCase() === selectedUser.userPrincipalName.toLocaleLowerCase())
-  ), [events, selectedUser]);
+  const userEvents = useMemo(() => events.filter((event) => matchesEntraIdentity(event, selectedUser)), [events, selectedUser]);
   const selectedSignIn = userEvents.find((event) => event.id === signInId) || userEvents[0] || null;
   const signInPoints = explainSignIn(selectedSignIn, selectedUser);
   const upn = selectedUser?.userPrincipalName?.trim().toLocaleLowerCase();
   const adMatches = upn ? principals.filter((principal) => (principal.userPrincipalName || "").trim().toLocaleLowerCase() === upn) : [];
   const userDevices = devices.filter((device) =>
-    (selectedUser?.id && device.userId === selectedUser.id) ||
-    (upn && (device.userPrincipalName || "").trim().toLocaleLowerCase() === upn)
+    sameTenant(snapshot.evidenceSources?.entra, snapshot.evidenceSources?.intune) && matchesEntraIdentity(device, selectedUser)
   );
 
   return (

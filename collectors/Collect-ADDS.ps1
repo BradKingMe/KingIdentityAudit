@@ -1,5 +1,5 @@
 #Requires -Modules ActiveDirectory
-# KingIdentity AD DS Collector 0.1.0
+# KingIdentity AD DS Collector 0.1.1
 # This script only issues Get-AD* directory queries and writes a local JSON file.
 [CmdletBinding()]
 param(
@@ -17,6 +17,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module ActiveDirectory -ErrorAction Stop
+
+$fullOutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+$outputDirectory = [System.IO.Path]::GetDirectoryName($fullOutputPath)
+if (-not (Test-Path -LiteralPath $outputDirectory -PathType Container)) { throw "Output directory does not exist: $outputDirectory" }
+if (Test-Path -LiteralPath $fullOutputPath) { throw "Output file already exists. Choose a new path: $fullOutputPath" }
 
 function ConvertTo-IsoTimestamp {
     param([AllowNull()][object]$Value)
@@ -51,7 +56,7 @@ $domainReports = [System.Collections.Generic.List[object]]::new()
 
 foreach ($domainName in $selectedDomains) {
     try {
-        $domain = Get-ADDomain -Identity $domainName -Server $domainName -ErrorAction Stop
+        $domainInfo = Get-ADDomain -Identity $domainName -Server $domainName -ErrorAction Stop
     }
     catch {
         $warnings.Add("Could not read domain metadata for ${domainName}: $($_.Exception.Message)")
@@ -77,6 +82,7 @@ foreach ($domainName in $selectedDomains) {
     }
 
     $domainControllers = @()
+    $dcInventoryComplete = $false
     try {
         $domainControllers = @(
             Get-ADDomainController -Filter * -Server $domainName -ErrorAction Stop |
@@ -85,9 +91,11 @@ foreach ($domainName in $selectedDomains) {
                         hostName = [string]$_.HostName
                         site = [string]$_.Site
                         operatingSystem = [string]$_.OperatingSystem
+                        computerObjectDN = [string]$_.ComputerObjectDN
                     }
                 }
         )
+        $dcInventoryComplete = $true
     }
     catch {
         $warnings.Add("Could not enumerate domain controllers for ${domainName}: $($_.Exception.Message)")
@@ -129,6 +137,7 @@ foreach ($domainName in $selectedDomains) {
             $principals.Add([ordered]@{
                 accountName = [string]$computer.SamAccountName
                 objectClass = 'computer'
+                isDomainController = $(if ($dcInventoryComplete) { [bool](@($domainControllers | ForEach-Object { $_.computerObjectDN }) -contains $computer.DistinguishedName) } else { $null })
                 objectGuid = [string]$computer.ObjectGUID
                 objectSid = [string]$computer.SID
                 userPrincipalName = $null
@@ -146,8 +155,12 @@ foreach ($domainName in $selectedDomains) {
         $warnings.Add("Could not enumerate computers for ${domainName}: $($_.Exception.Message)")
     }
 
+    $principalsByGuid = @{}
+    foreach ($principal in $principals) {
+        if ($principal.objectGuid) { $principalsByGuid[$principal.objectGuid] = $principal }
+    }
     $groupTargets = [System.Collections.Generic.List[object]]::new()
-    $domainSid = $domain.DomainSID.Value
+    $domainSid = $domainInfo.DomainSID.Value
     $groupTargets.Add([pscustomobject]@{ Name = 'Domain Admins'; SID = "${domainSid}-512"; Scope = $domainName })
     $groupTargets.Add([pscustomobject]@{ Name = 'Administrators'; SID = 'S-1-5-32-544'; Scope = $domainName })
     $groupTargets.Add([pscustomobject]@{ Name = 'Account Operators'; SID = 'S-1-5-32-548'; Scope = $domainName })
@@ -167,14 +180,18 @@ foreach ($domainName in $selectedDomains) {
                         [ordered]@{
                             accountName = [string]$(if ($_.SamAccountName) { $_.SamAccountName } else { $_.Name })
                             objectClass = [string]$_.ObjectClass
+                            objectGuid = [string]$_.ObjectGUID
+                            objectSid = [string]$_.SID
                             enabled = $null
                         }
                     }
             )
             foreach ($member in $members) {
                 if ($member.objectClass -eq 'user') {
-                    $matchedUser = $principals | Where-Object { $_.accountName -eq $member.accountName -and $_.objectClass -eq 'user' } | Select-Object -First 1
-                    if ($null -ne $matchedUser) { $member.enabled = $matchedUser.enabled }
+                    if ($member.objectGuid -and $principalsByGuid.ContainsKey($member.objectGuid)) {
+                        $matchedUser = $principalsByGuid[$member.objectGuid]
+                        if ($matchedUser.objectClass -eq 'user') { $member.enabled = $matchedUser.enabled }
+                    }
                 }
             }
             $privilegedGroups.Add([ordered]@{
@@ -208,8 +225,8 @@ foreach ($domainName in $selectedDomains) {
     }
 
     $domainReports.Add([ordered]@{
-        name = [string]$domain.DNSRoot
-        domainMode = [string]$domain.DomainMode
+        name = [string]$domainInfo.DNSRoot
+        domainMode = [string]$domainInfo.DomainMode
         passwordPolicy = $policy
         domainControllers = @($domainControllers)
         principals = @($principals)
@@ -236,7 +253,7 @@ $report = [ordered]@{
     capturedAt = [datetime]::UtcNow.ToString('o')
     collector = [ordered]@{
         name = 'KingIdentity AD DS Collector'
-        version = '0.1.0'
+        version = '0.1.1'
         inactiveAccountDays = $InactiveAccountDays
         includedDomains = @($selectedDomains)
         mode = 'read-only'
@@ -252,5 +269,10 @@ $report = [ordered]@{
 }
 
 $json = $report | ConvertTo-Json -Depth 10
-[System.IO.File]::WriteAllText($fullOutputPath, $json, [System.Text.UTF8Encoding]::new($false))
+$stream = [System.IO.File]::Open($fullOutputPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+try {
+    $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($json)
+    $stream.Write($bytes, 0, $bytes.Length)
+}
+finally { $stream.Dispose() }
 Write-Output "Snapshot written locally to $fullOutputPath"

@@ -510,3 +510,4 @@ h1 { margin-bottom: 8px; font-size: clamp(25px, 3vw, 31px); line-height: 1.16; l
   .data-table th, .data-table td { color: #222 !important; }
   a { color: #111 !important; text-decoration: underline; }
 }
+.table-pagination { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; margin: 16px 0; }

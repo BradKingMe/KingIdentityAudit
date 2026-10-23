@@ -1,6 +1,7 @@
 export const demoSnapshot = {
   format: "kingidentity.directory-snapshot",
   schemaVersion: 1,
+  adSourceMode: "synthetic",
   capturedAt: "2026-10-20T14:30:00.000Z",
   collector: {
     name: "KingIdentity AD DS Collector",
@@ -222,5 +223,11 @@ for (const [domainIndex, domain] of demoSnapshot.domains.entries()) {
     principal.userPrincipalName = principal.objectClass === "user"
       ? `${principal.accountName}@${domain.name}`
       : null;
+  }
+  for (const group of domain.privilegedGroups) {
+    for (const member of group.members) {
+      const principal = domain.principals.find((item) => item.accountName === member.accountName && item.objectClass === member.objectClass);
+      if (principal) Object.assign(member, { objectGuid: principal.objectGuid, objectSid: principal.objectSid });
+    }
   }
 }

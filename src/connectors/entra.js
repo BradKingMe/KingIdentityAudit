@@ -26,13 +26,15 @@ function safeError(error) {
   return error instanceof Error ? error.message : "The selected Microsoft Graph collection failed.";
 }
 
-async function collectList({ getToken, scopes, path, name, warnings, maxItems = 10_000 }) {
+async function collectList({ getToken, scopes, path, name, key, status, warnings, signal, maxItems = 10_000 }) {
   try {
     const token = await getToken(scopes);
-    const result = await fetchGraphCollection(token, path, { maxItems });
+    const result = await fetchGraphCollection(token, path, { maxItems, signal });
+    status[key] = result.truncated ? "partial" : "complete";
     if (result.truncated) warnings.push(`${name}: collection reached the local page or item limit; the returned records are incomplete.`);
     return result.records;
   } catch (error) {
+    status[key] = "failed";
     warnings.push(`${name}: ${safeError(error)}`);
     return [];
   }
@@ -132,8 +134,11 @@ export async function collectEntraEvidence({
   includeActivity = false,
   activityDays = 30,
   tenantId = null,
+  signal,
 }) {
+  if (!Number.isInteger(activityDays) || activityDays < 1 || activityDays > 90) throw new Error("Activity collection days must be an integer from 1 to 90.");
   const warnings = [];
+  const status = Object.fromEntries(["users", "groups", "directoryRoles", "signIns", "directoryAudits"].map((key) => [key, "not-selected"]));
   const selectedScopes = [
     ...(includeDirectory ? getEntraDirectoryScopes(includeAccountDetails) : []),
     ...(includeActivity ? ENTRA_ACTIVITY_SCOPES : []),
@@ -149,6 +154,7 @@ export async function collectEntraEvidence({
     signIns: [],
     directoryAudits: [],
     collectionWarnings: warnings,
+    collectionStatus: status,
   };
 
   if (includeDirectory) {
@@ -163,12 +169,12 @@ export async function collectEntraEvidence({
       "$select": "id,displayName,description,groupTypes,securityEnabled,mailEnabled",
       "$top": "999",
     });
-    const rolePath = graphQueryPath("directoryRoles", { "$select": "id,displayName,roleTemplateId", "$top": "999" });
+    const rolePath = graphQueryPath("directoryRoles", { "$select": "id,displayName,roleTemplateId" });
     const userScopes = [includeAccountDetails ? ENTRA_FULL_PROFILE_SCOPE : "User.ReadBasic.All"];
     const [users, groups, roles] = await Promise.all([
-      collectList({ getToken, scopes: userScopes, path: userPath, name: "Entra users", warnings }),
-      collectList({ getToken, scopes: ENTRA_GROUP_SCOPES, path: groupPath, name: "Entra groups", warnings }),
-      collectList({ getToken, scopes: ENTRA_ROLE_SCOPES, path: rolePath, name: "Activated Entra directory roles", warnings }),
+      collectList({ getToken, scopes: userScopes, path: userPath, name: "Entra users", key: "users", status, warnings, signal }),
+      collectList({ getToken, scopes: ENTRA_GROUP_SCOPES, path: groupPath, name: "Entra groups", key: "groups", status, warnings, signal }),
+      collectList({ getToken, scopes: ENTRA_ROLE_SCOPES, path: rolePath, name: "Activated Entra directory roles", key: "directoryRoles", status, warnings, signal }),
     ]);
     evidence.users = users.map(normalizeUser).filter((item) => item.id);
     evidence.groups = groups.map(normalizeGroup).filter((item) => item.id);
@@ -189,8 +195,8 @@ export async function collectEntraEvidence({
       "$top": "1000",
     });
     const [signIns, audits] = await Promise.all([
-      collectList({ getToken, scopes: ENTRA_ACTIVITY_SCOPES, path: signInPath, name: "Entra sign-in logs", warnings }),
-      collectList({ getToken, scopes: ENTRA_ACTIVITY_SCOPES, path: auditPath, name: "Entra directory audit logs", warnings }),
+      collectList({ getToken, scopes: ENTRA_ACTIVITY_SCOPES, path: signInPath, name: "Entra sign-in logs", key: "signIns", status, warnings, signal }),
+      collectList({ getToken, scopes: ENTRA_ACTIVITY_SCOPES, path: auditPath, name: "Entra directory audit logs", key: "directoryAudits", status, warnings, signal }),
     ]);
     evidence.signIns = signIns.map(normalizeSignIn).filter((item) => item.id);
     evidence.directoryAudits = audits.map(normalizeAudit).filter((item) => item.id);

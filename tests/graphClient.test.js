@@ -64,6 +64,7 @@ test("Entra evidence uses separate scopes and preserves successful collections a
     assert.equal(evidence.users.length, 1);
     assert.equal(evidence.groups.length, 0);
     assert.equal(evidence.directoryRoles.length, 1);
+    assert.deepEqual(evidence.collectionStatus, { users: "complete", groups: "failed", directoryRoles: "complete", signIns: "not-selected", directoryAudits: "not-selected" });
     assert.match(evidence.collectionWarnings[0], /Entra groups: Consent was not granted/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -112,9 +113,11 @@ test("Intune collection requests only the managed-device read scope and reports 
     assert.deepEqual(scopeRequests, [["DeviceManagementManagedDevices.Read.All"]]);
     assert.equal(evidence.devices[0].userId, "entra-user-1");
     assert.equal(evidence.devices[0].isEncrypted, true);
+    assert.equal(evidence.collectionStatus.devices, "complete");
 
     const unavailable = await collectIntuneEvidence({ getToken: async () => { throw new Error("Admin consent required."); } });
     assert.deepEqual(unavailable.devices, []);
+    assert.equal(unavailable.collectionStatus.devices, "failed");
     assert.match(unavailable.collectionWarnings[0], /Admin consent required/);
   } finally {
     globalThis.fetch = originalFetch;

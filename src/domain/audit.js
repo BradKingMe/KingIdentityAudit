@@ -54,12 +54,12 @@ export function buildFindings(snapshot) {
     const unknownLogon = enabled.filter((principal) =>
       principal.objectClass === "user" && !principal.lastLogonDate
     );
-    const delegation = enabled.filter((principal) => principal.trustedForDelegation === true);
+    const delegation = enabled.filter((principal) => principal.trustedForDelegation === true && principal.isDomainController !== true);
     const passwordExceptions = enabled.filter((principal) =>
       principal.objectClass === "user" && principal.passwordNeverExpires === true
     );
     const servicePrincipals = enabled.filter((principal) =>
-      Array.isArray(principal.servicePrincipalNames) && principal.servicePrincipalNames.length > 0
+      principal.objectClass === "user" && Array.isArray(principal.servicePrincipalNames) && principal.servicePrincipalNames.length > 0
     );
 
     if (delegation.length) {
@@ -73,7 +73,7 @@ export function buildFindings(snapshot) {
         evidence: delegation.map((principal) => `${principal.accountName} · ${principal.objectClass}`),
         affected: delegation,
         recommendation: "Confirm the owner and service requirement. Review whether constrained or resource-based delegation is appropriate and protect privileged accounts from delegation.",
-        limitation: "The flag is a review signal. Service dependencies and delegation scope must be confirmed before any change.",
+        limitation: "Confirmed domain controllers are excluded because their default delegation configuration requires separate handling. Other flags remain review signals; confirm service dependencies and delegation scope before a change.",
         source: sources.delegation,
       }));
     }

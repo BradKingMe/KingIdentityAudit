@@ -4,7 +4,7 @@ KingIdentity is a local-first identity evidence workbench. It combines a read-on
 
 ## Start the dashboard
 
-Requirements: Node.js 20.19+ or 22.12+, and pnpm 10+.
+Requirements: a supported Node.js LTS release (22.12+), and pnpm 10+.
 
 ```powershell
 pnpm install
@@ -31,7 +31,9 @@ By default, collection covers every domain in the forest. For a scoped review or
 
 ## Connect Microsoft Entra ID and Intune
 
-The **Sources** page uses `@azure/msal-browser` with authorization code flow and PKCE. Register a Single-page application in your tenant and add the exact origin shown by Vite as a SPA redirect URI (for example, `http://127.0.0.1:5173/` for local development). Enter the tenant ID/domain and public client ID in the page. Do not enter a client secret. The app requests only the delegated read scopes for the selected sources and uses MSAL's in-memory token cache.
+The **Sources** page uses `@azure/msal-browser` v5 with authorization code flow and PKCE. Register a Single-page application in your tenant and add the dedicated bridge URI shown in Sources as a SPA redirect URI (for example, `http://127.0.0.1:5173/redirect.html` for local development). The exact protocol, host, port, and path must match. The production build includes this page separately; do not serve the bridge with `Cross-Origin-Opener-Policy` headers. Enter the tenant ID/domain and public client ID in the page. Do not enter a client secret. The app requests only the delegated read scopes for the selected sources and uses MSAL's in-memory token cache.
+
+Live collection replaces the synthetic workspace with a cloud-only workspace. Import a real AD snapshot before collection to keep AD context. Switching tenants discards retained cloud sources from the previous tenant. Clearing cloud evidence or replacing the workspace aborts pending Graph reads and discards late results; it does not sign out of Microsoft's browser SSO session.
 
 | Selected source | Delegated permission |
 | --- | --- |
@@ -48,6 +50,7 @@ Entra basic mode collects only basic user profile fields. `User.Read.All` is opt
 - Accounts marked `PasswordNeverExpires`, shown as a review exception rather than an automatic failure.
 - User principals with service principal names, shown as an inventory signal rather than proof of Kerberoasting exposure.
 - Principals trusted for unconstrained delegation.
+- Confirmed domain controllers are excluded from the ordinary delegation finding and remain in inventory. Older snapshots without DC identification may still produce a review signal.
 - Current replication failure records returned by the AD DS module.
 - Membership inventory for selected built-in privileged groups.
 - Domain password policy and domain controller inventory as collected context.
@@ -70,7 +73,8 @@ KingIdentity grows through separate, opt-in source adapters. Each adapter disclo
 - Cross-source AD/Entra linking uses exact UPN in this version. It does not infer identity from display name or decode source-specific immutable IDs.
 - Group membership paths and user-to-role assignments are not collected from Entra yet.
 - **Tasks** creates an operator checklist only. It does not disable accounts, change memberships, assign roles, or issue Intune actions.
-- Account 360 membership details cover only the privileged groups returned by this collector. Recursive membership identifies effective members but does not retain each nested group path.
+- Account profiles match privileged group members by GUID or SID. Older member rows without stable IDs remain in group inventory but do not establish profile membership. Recursive membership does not retain each nested group path.
+- Snapshot comparison requires the same Microsoft tenant or AD forest/domain scope and complete inventory coverage. Failed, partial, or unselected collections are not treated as empty inventories. A collection that legitimately returns zero rows is recorded separately from a failed read.
 - AD object identifiers and user principal names are sensitive identity data; snapshots remain subject to the same handling restrictions as account and group inventories.
 - A missing finding does not prove that a domain is secure. Collection warnings, permissions, replication, and data freshness affect coverage.
 - `LastLogonDate` is based on the replicated `lastLogonTimestamp` attribute, so it is not an exact last-authentication time. Confirm inactivity with authoritative logs and an account owner before acting.
@@ -81,6 +85,7 @@ KingIdentity grows through separate, opt-in source adapters. Each adapter disclo
 ## Evidence sources
 
 - [MSAL Browser overview](https://learn.microsoft.com/en-us/entra/msal/javascript/browser/about-msal-browser) and [MSAL authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows)
+- [MSAL v5 redirect bridge setup](https://learn.microsoft.com/en-us/entra/msal/javascript/browser/redirect-bridge)
 - [Microsoft Graph permissions reference](https://learn.microsoft.com/en-us/graph/permissions-reference) and [Graph permissions overview](https://learn.microsoft.com/en-us/graph/permissions-overview)
 - [List users](https://learn.microsoft.com/en-us/graph/api/user-list?view=graph-rest-1.0), [list directory roles](https://learn.microsoft.com/en-us/graph/api/directoryrole-list?view=graph-rest-1.0), [list sign-ins](https://learn.microsoft.com/en-us/graph/api/signin-list?view=graph-rest-1.0), [list directory audits](https://learn.microsoft.com/en-us/graph/api/directoryaudit-list?view=graph-rest-1.0), [list Intune managed devices](https://learn.microsoft.com/en-us/graph/api/intune-devices-manageddevice-list?view=graph-rest-1.0)
 
@@ -94,3 +99,9 @@ KingIdentity grows through separate, opt-in source adapters. Each adapter disclo
 ## License
 
 No license is included yet. Ask the maintainer to choose reuse terms before redistributing this code.
+
+## Development checks
+
+Run `pnpm test` for domain and connector regressions. When PowerShell 7 is installed, this also executes the actual collector against a temporary mock ActiveDirectory module and checks output protection; it makes no directory connection. That one test reports a skip if `pwsh` is unavailable.
+
+Run `pnpm test:browser` to build and exercise the production output in an installed Google Chrome through Playwright. The suite covers imports, invalid metadata, text escaping, directory paging, the redirect page, and cancellation with mocked Microsoft authentication/Graph responses. It does not validate real sign-in, consent, AD DS access, or tenant licensing. Review the dated audit report for the checks actually run.
